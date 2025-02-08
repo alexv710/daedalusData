@@ -1,0 +1,34 @@
+image: node:20-slim
+
+# Define a cache template for pnpm
+.pnpm_cache_template: &pnpm_cache
+  cache:
+    key:
+      files:
+        - frontend/pnpm-lock.yaml
+    paths:
+      - frontend/.pnpm-store
+      - frontend/node_modules/
+
+# Install pnpm before each job
+before_script:
+  - npm install -g pnpm
+  - cd frontend
+
+stages:
+  - lint
+  - typecheck
+
+lint:
+  stage: lint
+  <<: *pnpm_cache
+  script:
+    - pnpm install
+    - pnpm run lint
+
+typecheck:
+  stage: typecheck
+  <<: *pnpm_cache
+  script:
+    - pnpm install
+    - pnpm run typecheck
