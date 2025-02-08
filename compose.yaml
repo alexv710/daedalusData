@@ -1,0 +1,36 @@
+services:
+  app:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "3000:3000"
+      - "8888:8888"
+    volumes:
+      - ./frontend:/app/frontend
+      - ./notebooks:/app/notebooks
+      - ./data:/data
+      - ./backend:/app/backend
+      - node_modules:/app/frontend/node_modules
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=/data/db/app.db
+      - JUPYTER_TOKEN=daedalus-dev
+    command: >
+      sh -c "jupyter notebook 
+      --ip=0.0.0.0 
+      --allow-root 
+      --no-browser 
+      --NotebookApp.token=daedalus-dev 
+      --notebook-dir=/app/notebooks & 
+      cd frontend && pnpm install && pnpm run dev"
+  init-db:
+    image: alpine:latest
+    volumes:
+      - ./data:/data
+      - ./backend:/app/backend
+      - ./scripts:/app/scripts
+    command: sh -c "apk add --no-cache sqlite && sqlite3 /data/db/app.db < /app/backend/schema.sql"
+
+volumes:
+  node_modules:
