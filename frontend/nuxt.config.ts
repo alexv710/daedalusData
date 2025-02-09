@@ -40,6 +40,11 @@ export default defineNuxtConfig({
   colorMode: {
     classSuffix: '',
   },
+  runtimeConfig: {
+    public: {
+      dataPath: '/data',
+    },
+  },
 
   future: {
     compatibilityVersion: 4,
@@ -66,6 +71,17 @@ export default defineNuxtConfig({
       routes: ['/'],
       ignore: ['/hi'],
     },
+    static: {
+      dir: '/app/data',
+      prefix: '/data/',
+    },
+    publicAssets: [
+      {
+        dir: '/app/data',
+        baseURL: '/data',
+        maxAge: 60 * 60 * 24 * 7,
+      },
+    ],
   },
 
   eslint: {
