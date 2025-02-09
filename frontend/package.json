@@ -17,7 +17,9 @@
     "@rollup/rollup-linux-x64-gnu": "4.9.5"
   },
   "resolutions": {
-    "rollup": "npm:@rollup/wasm-node"
+    "@nuxt/devtools": "^2.0.0",
+    "unplugin": "^2.1.2",
+    "vite": "^6.1.0"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.1.1",
@@ -39,9 +41,7 @@
     "typescript": "^5.7.3",
     "vue-tsc": "^2.2.0"
   },
-  "resolutions": {
-    "@nuxt/devtools": "^2.0.0",
-    "unplugin": "^2.1.2",
-    "vite": "^6.1.0"
+  "dependencies": {
+    "three": "^0.173.0"
   }
 }
