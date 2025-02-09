@@ -27,3 +27,6 @@ dist/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Mac specific files
+*.DS_Store
