@@ -9,7 +9,7 @@ services:
     volumes:
       - ./frontend:/app/frontend
       - ./notebooks:/app/notebooks
-      - ./data:/data
+      - ./data:/app/data
       - ./backend:/app/backend
       - node_modules:/app/frontend/node_modules
     environment:
@@ -27,7 +27,7 @@ services:
   init-db:
     image: alpine:latest
     volumes:
-      - ./data:/data
+      - ./data:/app/data
       - ./backend:/app/backend
       - ./scripts:/app/scripts
     command: sh -c "apk add --no-cache sqlite && sqlite3 /data/db/app.db < /app/backend/schema.sql"
