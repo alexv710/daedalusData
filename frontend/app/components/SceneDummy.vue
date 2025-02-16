@@ -1,18 +1,29 @@
 <script setup>
 import * as THREE from 'three'
 import { ArcballControls } from 'three/addons/controls/ArcballControls.js'
-
 // Props to set scene dimensions and an optional horizontal offset.
 const props = defineProps({
   width: { type: Number, required: true },
   height: { type: Number, required: true },
-  offsetX: { type: Number, default: 0 },
 })
 
+// Refs for canvas, camera and renderer.
 const canvas = ref(null)
+const cameraRef = ref(null)
+const rendererRef = ref(null)
+
+// Resize handler: updates the camera aspect and renderer size.
+function handleResize() {
+  if (cameraRef.value && rendererRef.value) {
+    console.log('Resizing scene to:', props.width, props.height)
+
+    cameraRef.value.aspect = props.width / props.height
+    cameraRef.value.updateProjectionMatrix()
+    rendererRef.value.setSize(props.width, props.height)
+  }
+}
 
 // --- Shader Code ---
-
 const vertexShader = `
 attribute vec4 instanceUV;
 attribute float instanceHighlight;
@@ -59,7 +70,6 @@ void main() {
 `
 
 // --- Instanced Mesh Creation with Shader Attributes ---
-
 /**
  * Creates an instanced mesh that uses the atlas texture and metadata
  * so that each instance shows its own sub-image.
@@ -99,7 +109,7 @@ function createInstancedMesh(atlasTexture, atlasData) {
     instanceHighlights[i] = 0.0
     instanceAspectRatios[i] = info.width / info.height
     // For now, position instances randomly.
-    instancePositions[i * 3] = (Math.random() - 0.5) * 50 + props.offsetX
+    instancePositions[i * 3] = (Math.random() - 0.5) * 50
     instancePositions[i * 3 + 1] = (Math.random() - 0.5) * 50
     instancePositions[i * 3 + 2] = 0
   }
@@ -140,7 +150,6 @@ function createInstancedMesh(atlasTexture, atlasData) {
 }
 
 // --- Controls Setup ---
-
 /**
  * Sets up ArcballControls for the scene using your configuration.
  *
@@ -175,10 +184,8 @@ function setupControls(camera, rendererElement, scene) {
 }
 
 // --- Main onMounted Block ---
-
 onMounted(async () => {
   console.log('Creating scene with dimensions:', props.width, props.height)
-  // Ensure we have valid scene dimensions.
   if (props.width <= 0 || props.height <= 0) {
     console.error('Invalid scene dimensions:', props.width, props.height)
     return
@@ -191,6 +198,10 @@ onMounted(async () => {
 
   const renderer = new THREE.WebGLRenderer({ canvas: canvas.value, antialias: true })
   renderer.setSize(props.width, props.height)
+
+  // Save references for resizing.
+  cameraRef.value = camera
+  rendererRef.value = renderer
 
   // Set up the ArcballControls.
   const controls = setupControls(camera, renderer.domElement, scene)
@@ -205,18 +216,26 @@ onMounted(async () => {
 
     // Load the atlas texture from /data/atlas.png.
     const textureLoader = new THREE.TextureLoader()
-    textureLoader.load('/data/atlas.png', (texture) => {
-      texture.flipY = false;
-      console.log('Atlas texture loaded:', texture)
-      const instancedMesh = createInstancedMesh(texture, atlasData)
-      scene.add(instancedMesh)
-    }, undefined, (error) => {
-      console.error('Error loading texture:', error)
-    })
+    textureLoader.load(
+      '/data/atlas.png',
+      (texture) => {
+        texture.flipY = false
+        console.log('Atlas texture loaded:', texture)
+        const instancedMesh = createInstancedMesh(texture, atlasData)
+        scene.add(instancedMesh)
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading texture:', error)
+      },
+    )
   }
   catch (err) {
     console.error('Error fetching atlas data:', err)
-  }
+  } 
+
+  // Add a window resize listener.
+  window.addEventListener('resize', handleResize)
 
   // Animation loop.
   function animate() {
@@ -225,6 +244,20 @@ onMounted(async () => {
     renderer.render(scene, camera)
   }
   animate()
+})
+
+// Clean up the resize listener when the component unmounts.
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
+
+// Expose handleResize if needed.
+defineExpose({
+  handleResize,
+})
+
+watch(() => [props.width, props.height], () => {
+  handleResize()
 })
 </script>
 
