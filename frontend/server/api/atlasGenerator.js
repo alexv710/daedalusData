@@ -28,23 +28,40 @@ async function generateAtlas() {
   let images = []
   if (Array.isArray(rawMetadata)) {
     images = rawMetadata
-  }
-  else {
+  } else {
     images = Object.entries(rawMetadata).map(([key, data]) => ({
       filename: `${key}.png`,
       ...data,
-      // Provide default dimensions if not specified:
-      width: data.width || 100,
-      height: data.height || 100,
     }))
   }
-
-  console.log('Final images array:', images)
 
   if (!images.length) {
     console.error('No images found in the JSON metadata.')
     throw new Error('No images found in the JSON metadata')
   }
+
+  // For each image, get its actual width and height from the file.
+  images = await Promise.all(
+    images.map(async (img) => {
+      const imgPath = path.join(dataDir, 'images', img.filename)
+      if (!fs.existsSync(imgPath)) {
+        console.warn(`File not found: ${imgPath}`)
+        return null
+      }
+      try {
+        const meta = await sharp(imgPath).metadata()
+        return {
+          ...img,
+          width: meta.width,
+          height: meta.height,
+        }
+      } catch (err) {
+        console.error(`Error reading metadata for ${img.filename}:`, err)
+        return null
+      }
+    })
+  )
+  images = images.filter((img) => img !== null)
 
   // Sort images by height descending (optional, helps with packing)
   images.sort((a, b) => b.height - a.height)
@@ -94,9 +111,7 @@ async function generateAtlas() {
   // Build an array of composite operations to place each image in the atlas.
   const composites = []
   for (const img of images) {
-    // Expect images to be in /app/data/images
     const imgPath = path.join(dataDir, 'images', img.filename)
-    console.log(`Checking for image file at: ${imgPath}`)
     if (!fs.existsSync(imgPath)) {
       console.warn(`File not found: ${imgPath}`)
       continue
@@ -124,13 +139,12 @@ async function generateAtlas() {
   return { atlasImagePath, atlasJsonPath }
 }
 
-// Export a lazy handler that calls generateAtlas when this API endpoint is requested.
+// Export a lazy handler that calls generateAtlas when thzis API endpoint is requested.
 export default defineEventHandler(async (event) => {
   try {
     const result = await generateAtlas()
     return { success: true, ...result }
-  }
-  catch (error) {
+  } catch (error) {
     console.error('An error occurred:', error)
     return { success: false, error: error.message }
   }
