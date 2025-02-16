@@ -1,10 +1,16 @@
+<template>
+  <canvas ref="canvas"></canvas>
+</template>
+
 <script setup>
 import * as THREE from 'three'
 import { ArcballControls } from 'three/addons/controls/ArcballControls.js'
+
 // Props to set scene dimensions and an optional horizontal offset.
 const props = defineProps({
   width: { type: Number, required: true },
   height: { type: Number, required: true },
+  offsetX: { type: Number, default: 0 },
 })
 
 // Refs for canvas, camera and renderer.
@@ -13,15 +19,19 @@ const cameraRef = ref(null)
 const rendererRef = ref(null)
 
 // Resize handler: updates the camera aspect and renderer size.
-function handleResize() {
+const handleResize = () => {
   if (cameraRef.value && rendererRef.value) {
     console.log('Resizing scene to:', props.width, props.height)
-
     cameraRef.value.aspect = props.width / props.height
     cameraRef.value.updateProjectionMatrix()
     rendererRef.value.setSize(props.width, props.height)
   }
 }
+
+// Watch for changes in props dimensions.
+watch(() => [props.width, props.height], () => {
+  handleResize()
+})
 
 // --- Shader Code ---
 const vertexShader = `
@@ -46,7 +56,7 @@ void main() {
     // Scale the base plane geometry.
     vec3 scaledPosition = position * vec3(width, height, 1.0);
     
-    // Use the instance matrix (which we set from instancePosition) to position the plane.
+    // Use the instance matrix (set from instancePosition) to position the plane.
     vec4 worldPosition = instanceMatrix * vec4(scaledPosition, 1.0);
     gl_Position = projectionMatrix * modelViewMatrix * worldPosition;
 }
@@ -71,15 +81,14 @@ void main() {
 
 // --- Instanced Mesh Creation with Shader Attributes ---
 /**
- * Creates an instanced mesh that uses the atlas texture and metadata
- * so that each instance shows its own sub-image.
+ * Creates an instanced mesh that uses the atlas texture and metadata so that each instance shows its own sub-image.
  *
  * @param {THREE.Texture} atlasTexture - The loaded atlas texture.
  * @param {object} atlasData - Atlas metadata object.
  * @returns {THREE.InstancedMesh}
  */
 function createInstancedMesh(atlasTexture, atlasData) {
-  // Convert the atlasData object into an array.
+  // Convert atlasData object into an array.
   const atlasInfoArray = Object.entries(atlasData).map(([filename, info]) => ({
     filename,
     ...info,
@@ -89,17 +98,16 @@ function createInstancedMesh(atlasTexture, atlasData) {
   // Create a simple plane geometry.
   const geometry = new THREE.PlaneGeometry(1, 1)
 
-  // Create arrays for our custom per-instance attributes.
+  // Create arrays for custom per-instance attributes.
   const instanceUVs = new Float32Array(count * 4)
   const instanceHighlights = new Float32Array(count)
   const instanceAspectRatios = new Float32Array(count)
   const instancePositions = new Float32Array(count * 3)
 
-  // Compute per-instance data from the atlas info.
+  // Compute per-instance data from atlas info.
   for (let i = 0; i < count; i++) {
     const info = atlasInfoArray[i]
     // Compute UV coordinates relative to the atlas.
-    // Note: The old code made the height negative to flip the texture vertically.
     const uvX = info.x / atlasTexture.image.width
     const uvWidth = info.width / atlasTexture.image.width
     const uvHeight = info.height / atlasTexture.image.height
@@ -108,23 +116,23 @@ function createInstancedMesh(atlasTexture, atlasData) {
     instanceUVs.set([uvX, uvY, uvWidth, uvH], i * 4)
     instanceHighlights[i] = 0.0
     instanceAspectRatios[i] = info.width / info.height
-    // For now, position instances randomly.
+    // For now, assign random positions.
     instancePositions[i * 3] = (Math.random() - 0.5) * 50
     instancePositions[i * 3 + 1] = (Math.random() - 0.5) * 50
     instancePositions[i * 3 + 2] = 0
   }
 
-  // Attach our custom attributes to the geometry.
+  // Attach custom attributes.
   geometry.setAttribute('instanceUV', new THREE.InstancedBufferAttribute(instanceUVs, 4))
   geometry.setAttribute('instanceHighlight', new THREE.InstancedBufferAttribute(instanceHighlights, 1))
   geometry.setAttribute('instanceAspectRatio', new THREE.InstancedBufferAttribute(instanceAspectRatios, 1))
   geometry.setAttribute('instancePosition', new THREE.InstancedBufferAttribute(instancePositions, 3))
 
-  // Create a ShaderMaterial that uses our custom shaders.
+  // Create a ShaderMaterial using our custom shaders.
   const material = new THREE.ShaderMaterial({
     uniforms: {
       map: { value: atlasTexture },
-      highlightColor: { value: new THREE.Color(0xFF0000) }, // Example highlight color.
+      highlightColor: { value: new THREE.Color(0xff0000) },
       highlightIntensity: { value: 0.5 },
     },
     vertexShader,
@@ -134,8 +142,6 @@ function createInstancedMesh(atlasTexture, atlasData) {
 
   // Create the instanced mesh.
   const instancedMesh = new THREE.InstancedMesh(geometry, material, count)
-
-  // Set each instance's matrix based on our random positions.
   const matrix = new THREE.Matrix4()
   for (let i = 0; i < count; i++) {
     const x = instancePositions[i * 3]
@@ -191,7 +197,7 @@ onMounted(async () => {
     return
   }
 
-  // Set up the Three.js scene, camera, and renderer.
+  // Set up scene, camera, and renderer.
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(75, props.width / props.height, 0.1, 1000)
   camera.position.z = 50
@@ -203,14 +209,13 @@ onMounted(async () => {
   cameraRef.value = camera
   rendererRef.value = renderer
 
-  // Set up the ArcballControls.
+  // Set up ArcballControls.
   const controls = setupControls(camera, renderer.domElement, scene)
 
-  // Fetch the atlas metadata from /data/atlas.json.
+  // Fetch atlas metadata from /data/atlas.json.
   try {
     const response = await fetch('/data/atlas.json')
-    if (!response.ok)
-      throw new Error('Failed to fetch atlas.json')
+    if (!response.ok) throw new Error('Failed to fetch atlas.json')
     const atlasData = await response.json()
     console.log('Fetched atlas data:', atlasData)
 
@@ -227,14 +232,13 @@ onMounted(async () => {
       undefined,
       (error) => {
         console.error('Error loading texture:', error)
-      },
+      }
     )
-  }
-  catch (err) {
+  } catch (err) {
     console.error('Error fetching atlas data:', err)
-  } 
+  }
 
-  // Add a window resize listener.
+  // Add window resize listener.
   window.addEventListener('resize', handleResize)
 
   // Animation loop.
@@ -255,15 +259,7 @@ onUnmounted(() => {
 defineExpose({
   handleResize,
 })
-
-watch(() => [props.width, props.height], () => {
-  handleResize()
-})
 </script>
-
-<template>
-  <canvas ref="canvas" />
-</template>
 
 <style scoped>
 canvas {
