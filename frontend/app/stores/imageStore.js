@@ -80,6 +80,36 @@ export const useImageStore = defineStore('image', () => {
     }
   }
 
+  // --- Projection management ---
+  // Holds the currently selected projection file name.
+  const currentProjection = ref(null)
+  // Holds the list of available projection file names.
+  const availableProjections = ref([])
+
+  // Load available projection file names from the manifest.
+  async function loadProjections() {
+    try {
+      const response = await fetch('/data/projections/projection_manifest.json')
+      if (!response.ok) {
+        throw new Error('Failed to fetch projection manifest.')
+      }
+      const manifest = await response.json()
+      // manifest is assumed to be an array of file names.
+      availableProjections.value = manifest
+      if (manifest.length > 0) {
+        currentProjection.value = manifest[0]
+      }
+    } catch (error) {
+      console.error('Error loading projections:', error)
+      availableProjections.value = []
+      currentProjection.value = null
+    }
+  }
+
+  function selectProjection(projectionFileName) {
+    currentProjection.value = projectionFileName
+  }
+
   return {
     images,
     selectedIds,
@@ -99,6 +129,10 @@ export const useImageStore = defineStore('image', () => {
     addHighlight,
     removeHighlight,
     toggleHighlight,
+    currentProjection,
+    availableProjections,
+    loadProjections,
+    selectProjection,
   }
 })
 
