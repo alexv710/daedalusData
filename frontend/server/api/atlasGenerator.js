@@ -28,7 +28,8 @@ async function generateAtlas() {
   let images = []
   if (Array.isArray(rawMetadata)) {
     images = rawMetadata
-  } else {
+  }
+  else {
     images = Object.entries(rawMetadata).map(([key, data]) => ({
       filename: `${key}.png`,
       ...data,
@@ -55,13 +56,14 @@ async function generateAtlas() {
           width: meta.width,
           height: meta.height,
         }
-      } catch (err) {
+      }
+      catch (err) {
         console.error(`Error reading metadata for ${img.filename}:`, err)
         return null
       }
-    })
+    }),
   )
-  images = images.filter((img) => img !== null)
+  images = images.filter(img => img !== null)
 
   // Sort images by height descending (optional, helps with packing)
   images.sort((a, b) => b.height - a.height)
@@ -144,7 +146,8 @@ export default defineEventHandler(async (event) => {
   try {
     const result = await generateAtlas()
     return { success: true, ...result }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('An error occurred:', error)
     return { success: false, error: error.message }
   }

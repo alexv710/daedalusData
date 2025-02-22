@@ -13,13 +13,12 @@
     "lint": "eslint .",
     "typecheck": "vue-tsc --noEmit"
   },
+  "dependencies": {
+    "sharp": "^0.33.5",
+    "three": "^0.173.0"
+  },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "4.9.5"
-  },
-  "resolutions": {
-    "@nuxt/devtools": "^2.0.0",
-    "unplugin": "^2.1.2",
-    "vite": "^6.1.0"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.1.1",
@@ -46,8 +45,9 @@
     "vue-tsc": "^2.2.0",
     "vuetify-nuxt-module": "^0.18.3"
   },
-  "dependencies": {
-    "sharp": "^0.33.5",
-    "three": "^0.173.0"
+  "resolutions": {
+    "@nuxt/devtools": "^2.0.0",
+    "unplugin": "^2.1.2",
+    "vite": "^6.1.0"
   }
 }

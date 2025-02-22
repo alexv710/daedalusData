@@ -17,9 +17,11 @@ const dataset = ref<DatasetInfo>({
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const formatFileSize = (bytes: number) => {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+function formatFileSize(bytes: number) {
+  if (bytes < 1024)
+    return `${bytes} B`
+  if (bytes < 1024 * 1024)
+    return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
@@ -51,7 +53,9 @@ onMounted(async () => {
 <template>
   <div class="p-4">
     <v-btn class="mb-4">
-      <NuxtLink to="/scene">Analyse Dataset</NuxtLink>
+      <NuxtLink to="/scene">
+        Analyse Dataset
+      </NuxtLink>
     </v-btn>
 
     <h1 class="mb-4 text-2xl font-bold">
@@ -108,7 +112,7 @@ onMounted(async () => {
             <div class="truncate text-center">
               {{ image.name }}
             </div>
-            <div class="text-xs text-gray-500 text-center">
+            <div class="text-center text-xs text-gray-500">
               {{ formatFileSize(image.size) }}
             </div>
           </div>

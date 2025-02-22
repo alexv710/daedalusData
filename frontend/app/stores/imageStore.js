@@ -1,5 +1,5 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 
 export const useImageStore = defineStore('image', () => {
   // A Map to store image metadata (static data).
@@ -30,10 +30,10 @@ export const useImageStore = defineStore('image', () => {
 
   // Computed properties to get selected and highlighted image metadata.
   const selectedImages = computed(() =>
-    Array.from(selectedIds.value).map((id) => images.value.get(id))
+    Array.from(selectedIds.value).map(id => images.value.get(id)),
   )
   const highlightedImages = computed(() =>
-    Array.from(highlightedIds.value).map((id) => images.value.get(id))
+    Array.from(highlightedIds.value).map(id => images.value.get(id)),
   )
 
   // Actions for selection.
@@ -49,7 +49,8 @@ export const useImageStore = defineStore('image', () => {
   function toggleSelection(key) {
     if (selectedIds.value.has(key)) {
       selectedIds.value.delete(key)
-    } else {
+    }
+    else {
       selectedIds.value.add(key)
     }
   }
@@ -73,7 +74,8 @@ export const useImageStore = defineStore('image', () => {
   function toggleHighlight(key) {
     if (highlightedIds.value.has(key)) {
       highlightedIds.value.delete(key)
-    } else {
+    }
+    else {
       highlightedIds.value.add(key)
     }
   }

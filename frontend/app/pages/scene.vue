@@ -27,7 +27,7 @@ onMounted(() => {
 <template>
   <div
     ref="sceneContainer"
-    class="bg-green h-screen"
+    class="h-screen bg-green"
   >
     <SceneDummy
       v-if="containerSize.width > 0 && containerSize.height > 0"

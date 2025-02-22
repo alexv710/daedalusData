@@ -196,11 +196,12 @@ const lastHovered = { index: -1, mesh: null }
 function pointInPolygon(point, polygon) {
   let inside = false
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x, yi = polygon[i].y
-    const xj = polygon[j].x, yj = polygon[j].y
-    const intersect = ((yi > point.y) !== (yj > point.y)) &&
-      (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)
-    if (intersect) inside = !inside
+    const xi = polygon[i].x; const yi = polygon[i].y
+    const xj = polygon[j].x; const yj = polygon[j].y
+    const intersect = ((yi > point.y) !== (yj > point.y))
+      && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)
+    if (intersect)
+      inside = !inside
   }
   return inside
 }
@@ -221,12 +222,12 @@ function updateHoveredMesh(
       console.warn('Scene is null, skipping lasso raycasting')
       return
     }
-    
+
     console.time('Lasso Total Time')
-    
+
     // Build a 2D lasso polygon by projecting the lasso shape points.
     console.time('Build Lasso Polygon')
-    const lassoPolygon = lassoShapePoints.value.map(pt => {
+    const lassoPolygon = lassoShapePoints.value.map((pt) => {
       const projected = pt.clone().project(cameraRef.value!)
       return {
         x: (projected.x + 1) * 0.5 * props.width,
@@ -234,7 +235,7 @@ function updateHoveredMesh(
       }
     })
     console.timeEnd('Build Lasso Polygon')
-    
+
     console.time('Traverse Instanced Meshes')
     const allMeshes: THREE.InstancedMesh[] = []
     scene.traverse((obj) => {
@@ -257,12 +258,13 @@ function updateHoveredMesh(
         const sy = (-screenPos.y + 1) * 0.5 * props.height
         if (pointInPolygon({ x: sx, y: sy }, lassoPolygon)) {
           const key = instanceToKeyMap.get(instanceId)
-          if (key) selectedKeys.add(key)
+          if (key)
+            selectedKeys.add(key)
         }
       }
     })
     console.timeEnd('Accumulate Selected Keys')
-    
+
     console.time('Batch Update Selection')
     // If Ctrl is not held, replace the current selection; if it is held, add to it.
     if (!isControlPressed) {
@@ -282,7 +284,7 @@ function updateHoveredMesh(
       }
     })
     console.timeEnd('Update Highlights')
-    
+
     console.timeEnd('Lasso Total Time')
   }
   // --- Standard Raycasting (Hover/Click) ---
@@ -417,7 +419,7 @@ function handleMouseDown(event: MouseEvent) {
 
 function handleMouseMove(event: MouseEvent) {
   updateMouse(event)
-  
+
   // If we are in lasso drawing mode, record depth points and update 2D lasso shape.
   if (lassoDrawing.value && cameraRef.value && rendererRef.value) {
     // --- Record depth points (for selection) ---
@@ -438,7 +440,7 @@ function handleMouseMove(event: MouseEvent) {
     const rect = rendererRef.value.domElement.getBoundingClientRect()
     const mouse = new THREE.Vector2(
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
-      -((event.clientY - rect.top) / rect.height) * 2 + 1
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
     )
     const mouseNDC = new THREE.Vector3(mouse.x, mouse.y, -1)
     mouseNDC.unproject(cameraRef.value)
@@ -511,20 +513,20 @@ onMounted(async () => {
   const renderer = new THREE.WebGLRenderer({ canvas: canvas.value, antialias: true })
   renderer.setSize(props.width, props.height)
   rendererRef.value = renderer
-  
+
   lassoShapeMesh.value = new THREE.Mesh(
-    new THREE.ShapeGeometry(), 
+    new THREE.ShapeGeometry(),
     new THREE.MeshBasicMaterial({
       color: 0x0000FF,
       transparent: true,
       opacity: 0.3,
       side: THREE.DoubleSide,
-    })
+    }),
   )
   lassoShapeMesh.value.frustumCulled = false
   lassoShapeMesh.value.visible = false
   scene.add(lassoShapeMesh.value)
-  
+
   const controls = setupControls(camera, renderer.domElement, scene)
   try {
     const response = await fetch('/data/atlas.json')
