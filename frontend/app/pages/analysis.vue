@@ -3,6 +3,9 @@ const sceneRef = ref(null)
 const sceneContainer = ref(null)
 const containerSize = ref({ width: 0, height: 0 })
 
+const imageStore = useImageStore()
+const currentProjection = computed(() => imageStore.currentProjection)
+
 useResizeObserver(sceneContainer, (entries) => {
   const entry = entries[0]
   if (entry) {
@@ -25,15 +28,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div
-    ref="sceneContainer"
-    class="h-screen bg-green"
-  >
-    <Scene
-      v-if="containerSize.width > 0 && containerSize.height > 0"
-      ref="sceneRef"
-      :height="containerSize.height"
-      :width="containerSize.width"
-    />
+  <div>
+    <ProjectionSelector />
+    <div
+      ref="sceneContainer"
+      class="h-screen bg-green"
+    >
+      <Scene
+        v-if="containerSize.width > 0 && containerSize.height > 0 && currentProjection"
+        ref="sceneRef"
+        :height="containerSize.height"
+        :width="containerSize.width"
+      />
+    </div>
   </div>
 </template>
