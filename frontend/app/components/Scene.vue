@@ -11,7 +11,6 @@ const props = defineProps({
 // ----- Pinia Store Integration -----
 // Load image metadata into the store.
 const imageStore = useImageStore()
-await imageStore.loadImageMetadata()
 
 // Build mapping from instance index to image key.
 const instanceToKeyMap = new Map<string, string>()
@@ -196,8 +195,10 @@ const lastHovered = { index: -1, mesh: null }
 function pointInPolygon(point, polygon) {
   let inside = false
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x; const yi = polygon[i].y
-    const xj = polygon[j].x; const yj = polygon[j].y
+    const xi = polygon[i].x
+    const yi = polygon[i].y
+    const xj = polygon[j].x
+    const yj = polygon[j].y
     const intersect = ((yi > point.y) !== (yj > point.y))
       && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)
     if (intersect)
@@ -372,31 +373,6 @@ function updateHoveredMesh(
   }
 }
 
-// Helper: determine if a point is inside the lasso volume.
-function isPointInLassoVolume(point: THREE.Vector3, nearPoints: THREE.Vector3[], farPoints: THREE.Vector3[]): boolean {
-  const numPoints = nearPoints.length
-  let inside = false
-  const ray = new THREE.Ray(point, new THREE.Vector3(0, 0, 1))
-  const target = new THREE.Vector3()
-  for (let i = 0, j = numPoints - 1; i < numPoints; j = i++) {
-    const a1 = nearPoints[i]; const a2 = farPoints[i]
-    const b1 = nearPoints[j]; const b2 = farPoints[j]
-    if (!a1 || !a2 || !b1 || !b2) {
-      console.warn('Undefined point in lasso volume check', { i, j, a1, a2, b1, b2 })
-      continue
-    }
-    try {
-      if (ray.intersectTriangle(a1, a2, b1, false, target) || ray.intersectTriangle(a2, b2, b1, false, target)) {
-        inside = !inside
-      }
-    }
-    catch (error) {
-      console.error('Error in ray intersection', error, { i, j, a1, a2, b1, b2 })
-    }
-  }
-  return inside
-}
-
 // ----- Mouse Event Handlers -----
 // For hover and left-click, we distinguish click from drag.
 const leftClickStartPos = ref<THREE.Vector2 | null>(null)
@@ -499,6 +475,10 @@ function handleMouseUp(event: MouseEvent) {
 }
 
 // ----- Main onMounted Block -----
+onBeforeMount(async () => {
+  await imageStore.loadImageMetadata()
+})
+
 onMounted(async () => {
   console.log('Creating scene with dimensions:', props.width, props.height)
   if (props.width <= 0 || props.height <= 0) {

@@ -15,4 +15,9 @@ export default nuxt(
       '.pnpm-store/',
     ],
   },
+  {
+    rules: {
+      'no-console': 'off',
+    },
+  },
 )

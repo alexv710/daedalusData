@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import process from 'node:process'
 import { defineEventHandler } from 'h3'
 import sharp from 'sharp'
 
@@ -142,7 +143,7 @@ async function generateAtlas() {
 }
 
 // Export a lazy handler that calls generateAtlas when thzis API endpoint is requested.
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async () => {
   try {
     const result = await generateAtlas()
     return { success: true, ...result }
