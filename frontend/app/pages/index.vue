@@ -53,7 +53,7 @@ onMounted(async () => {
 <template>
   <div class="p-4">
     <v-btn class="mb-4">
-      <NuxtLink to="/scene">
+      <NuxtLink to="/analysis">
         Analyse Dataset
       </NuxtLink>
     </v-btn>

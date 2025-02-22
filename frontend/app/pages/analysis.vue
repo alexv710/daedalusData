@@ -29,7 +29,7 @@ onMounted(() => {
     ref="sceneContainer"
     class="h-screen bg-green"
   >
-    <SceneDummy
+    <Scene
       v-if="containerSize.width > 0 && containerSize.height > 0"
       ref="sceneRef"
       :height="containerSize.height"
