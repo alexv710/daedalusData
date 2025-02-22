@@ -174,7 +174,7 @@ const boundingBox = new THREE.Box3()
 const instancePosition = new THREE.Vector3()
 const instanceScale = new THREE.Vector3()
 const localIntersection = new THREE.Vector3()
-const DEBUG_LASSO = 'false'
+const DEBUG_LASSO = false
 const debugConvexHullMesh = shallowRef<THREE.Mesh | null>(null)
 
 // Update mouse vector.
