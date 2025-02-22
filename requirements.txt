@@ -4,3 +4,4 @@ pillow
 torch
 torchvision
 scikit-learn
+tensorflow
