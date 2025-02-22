@@ -5,8 +5,6 @@ import { ArcballControls } from 'three/addons/controls/ArcballControls.js'
  * Composable for various Three.js helper functions.
  */
 export function useThree() {
-  const colorMode = useColorMode()
-
   /**
    * Sets up and returns the controls for the Three.js camera.
    * @param {THREE.Camera} camera - The Three.js camera.

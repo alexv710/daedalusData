@@ -42,7 +42,7 @@ onMounted(async () => {
     }
   }
   catch (e) {
-    error.value = 'Failed to load dataset information'
+    error.value = `Failed to load dataset information:${e}`
   }
   finally {
     loading.value = false
