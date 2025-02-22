@@ -17,8 +17,7 @@ await imageStore.loadImageMetadata()
 
 // Build mapping from instance index to image key.
 const instanceToKeyMap = new Map<string, string>()
-const imageKeys = Array.from(imageStore.images.keys())
-imageKeys.forEach((key, i) => {
+Array.from(imageStore.images.keys()).forEach((key, i) => {
   instanceToKeyMap.set(i, key)
 })
 console.log('Instance to key map:', instanceToKeyMap)
@@ -174,8 +173,6 @@ const boundingBox = new THREE.Box3()
 const instancePosition = new THREE.Vector3()
 const instanceScale = new THREE.Vector3()
 const localIntersection = new THREE.Vector3()
-const DEBUG_LASSO = false
-const debugConvexHullMesh = shallowRef<THREE.Mesh | null>(null)
 
 // Update mouse vector.
 function updateMouse(event: MouseEvent) {
@@ -197,7 +194,19 @@ function setInstanceHighlight(mesh: THREE.InstancedMesh, index: number, value: n
 // Reusable variables for raycasting.
 const lastHovered = { index: -1, mesh: null }
 
-// Main function to update hovered mesh or selection.
+// Utility: 2D point–in–polygon test (ray–casting algorithm)
+function pointInPolygon(point, polygon) {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y
+    const xj = polygon[j].x, yj = polygon[j].y
+    const intersect = ((yi > point.y) !== (yj > point.y)) &&
+      (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
 function updateHoveredMesh(
   interactionType: 'hover' | 'left-click' | 'right-click' | 'lasso',
   isControlPressed: boolean,
@@ -208,104 +217,75 @@ function updateHoveredMesh(
     console.warn('Camera is null, skipping raycasting')
     return
   }
-  // --- Lasso Mode ---
+  // --- Lasso Mode: Only update on mouseup ---
   if (interactionType === 'lasso' && lassoDepthPoints && lassoDepthPoints.length >= 18) {
     if (!scene) {
       console.warn('Scene is null, skipping lasso raycasting')
       return
     }
-    if (debugConvexHullMesh.value) {
-      scene.remove(debugConvexHullMesh.value)
-      debugConvexHullMesh.value.geometry.dispose()
-      debugConvexHullMesh.value.material.dispose()
-      debugConvexHullMesh.value = null
-    }
-    // If ctrl is not pressed, reset selection; otherwise, keep existing selections.
-    if (!isControlPressed) {
-      imageStore.images.forEach((meta, key) => {
-        meta.selected = false
-      })
-    }
-    const selectedInstances: { mesh: THREE.InstancedMesh, instanceId: number }[] = []
-    const nearPoints: THREE.Vector3[] = []
-    const farPoints: THREE.Vector3[] = []
-    for (let i = 0; i < lassoDepthPoints.length; i += 6) {
-      nearPoints.push(new THREE.Vector3(
-        lassoDepthPoints[i],
-        lassoDepthPoints[i + 1],
-        lassoDepthPoints[i + 2],
-      ))
-      farPoints.push(new THREE.Vector3(
-        lassoDepthPoints[i + 3],
-        lassoDepthPoints[i + 4],
-        lassoDepthPoints[i + 5],
-      ))
-    }
-    const geometry = new THREE.BufferGeometry()
-    const vertices = []
-    const indices = []
-    nearPoints.forEach(p => vertices.push(p.x, p.y, p.z))
-    farPoints.forEach(p => vertices.push(p.x, p.y, p.z))
-    const numPoints = nearPoints.length
-    for (let i = 0; i < numPoints; i++) {
-      const nextI = (i + 1) % numPoints
-      indices.push(i, nextI, i + numPoints)
-      indices.push(nextI, nextI + numPoints, i + numPoints)
-      indices.push(i, i + numPoints, nextI)
-      indices.push(nextI, i + numPoints, nextI + numPoints)
-    }
-    geometry.setIndex(indices)
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
-    geometry.computeVertexNormals()
-
-    if (DEBUG_LASSO) {
-      const material = new THREE.MeshBasicMaterial({
-        color: 0xD9EAD3,
-        transparent: true,
-        opacity: 0.2,
-        side: THREE.DoubleSide,
-      })
-      debugConvexHullMesh.value = new THREE.Mesh(geometry, material)
-      scene.add(debugConvexHullMesh.value)
-      console.log('Lasso debug mesh added to scene', debugConvexHullMesh.value)
-    }
-    const tempVector = new THREE.Vector3()
-    const tempMatrix = new THREE.Matrix4()
-    // Traverse all instanced meshes in the scene.
+    
+    console.time('Lasso Total Time')
+    
+    // Build a 2D lasso polygon by projecting the lasso shape points.
+    console.time('Build Lasso Polygon')
+    const lassoPolygon = lassoShapePoints.value.map(pt => {
+      const projected = pt.clone().project(cameraRef.value!)
+      return {
+        x: (projected.x + 1) * 0.5 * props.width,
+        y: (-projected.y + 1) * 0.5 * props.height,
+      }
+    })
+    console.timeEnd('Build Lasso Polygon')
+    
+    console.time('Traverse Instanced Meshes')
     const allMeshes: THREE.InstancedMesh[] = []
-    scene?.traverse((obj) => {
+    scene.traverse((obj) => {
       if (obj instanceof THREE.InstancedMesh) {
         allMeshes.push(obj)
       }
     })
+    console.timeEnd('Traverse Instanced Meshes')
+
+    console.time('Accumulate Selected Keys')
+    const selectedKeys = new Set<string>()
+    const tempMatrix = new THREE.Matrix4()
+    const instancePos = new THREE.Vector3()
     allMeshes.forEach((mesh) => {
       for (let instanceId = 0; instanceId < mesh.count; instanceId++) {
         mesh.getMatrixAt(instanceId, tempMatrix)
-        tempVector.setFromMatrixPosition(tempMatrix)
-        if (isPointInLassoVolume(tempVector, nearPoints, farPoints)) {
-          selectedInstances.push({ mesh, instanceId })
+        tempMatrix.decompose(instancePos, new THREE.Quaternion(), new THREE.Vector3())
+        const screenPos = instancePos.clone().project(cameraRef.value!)
+        const sx = (screenPos.x + 1) * 0.5 * props.width
+        const sy = (-screenPos.y + 1) * 0.5 * props.height
+        if (pointInPolygon({ x: sx, y: sy }, lassoPolygon)) {
+          const key = instanceToKeyMap.get(instanceId)
+          if (key) selectedKeys.add(key)
         }
       }
     })
-    console.log(`Lasso selected ${selectedInstances.length} instances`)
-    selectedInstances.forEach(({ mesh, instanceId }) => {
-      const key = instanceToKeyMap.get(instanceId)
-      if (key) {
-        const meta = imageStore.images.get(key)
-        if (meta) {
-          meta.selected = true
-        }
-      }
-    })
-    // Update highlight for all meshes based on their selection state.
+    console.timeEnd('Accumulate Selected Keys')
+    
+    console.time('Batch Update Selection')
+    // If Ctrl is not held, replace the current selection; if it is held, add to it.
+    if (!isControlPressed) {
+      console.log('Clearing selection')
+      imageStore.clearSelection()
+    }
+    imageStore.batchSelect(selectedKeys)
+    console.timeEnd('Batch Update Selection')
+
+    console.time('Update Highlights')
+    // For each instance, update its highlight based on whether its key is in selectedIds.
     allMeshes.forEach((mesh) => {
       for (let instanceId = 0; instanceId < mesh.count; instanceId++) {
         const key = instanceToKeyMap.get(instanceId)
-        const meta = key ? imageStore.images.get(key) : null
-        const highlight = meta && meta.selected ? 1 : 0
+        const highlight = (key && imageStore.selectedIds.has(key)) ? 1 : 0
         setInstanceHighlight(mesh, instanceId, highlight)
       }
     })
+    console.timeEnd('Update Highlights')
+    
+    console.timeEnd('Lasso Total Time')
   }
   // --- Standard Raycasting (Hover/Click) ---
   else {
@@ -350,16 +330,13 @@ function updateHoveredMesh(
         }
       }
     })
-    // Update camera matrix and frustum.
     cameraRef.value!.updateMatrixWorld(true)
     projScreenMatrix.multiplyMatrices(cameraRef.value!.projectionMatrix, cameraRef.value!.matrixWorldInverse)
     frustum.setFromProjectionMatrix(projScreenMatrix)
     raycaster.setFromCamera(mouseVec, cameraRef.value!)
-    // If a previously hovered instance is not selected, remove its hover highlight.
     if (lastHovered.index !== -1 && lastHovered.mesh) {
       const key = instanceToKeyMap.get(lastHovered.index)
-      const meta = key ? imageStore.images.get(key) : null
-      if (!meta || !meta.selected) {
+      if (!key || !imageStore.selectedIds.has(key)) {
         setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
       }
       lastHovered.index = -1
@@ -368,10 +345,8 @@ function updateHoveredMesh(
     if (closestMesh && closestInstanceId !== -1) {
       switch (interactionType) {
         case 'hover': {
-          // On hover, if the instance is not already selected, temporarily highlight it.
           const key = instanceToKeyMap.get(closestInstanceId)
-          const meta = key ? imageStore.images.get(key) : null
-          if (!meta || !meta.selected) {
+          if (!key || !imageStore.selectedIds.has(key)) {
             setInstanceHighlight(closestMesh, closestInstanceId, 1)
           }
           lastHovered.index = closestInstanceId
@@ -379,20 +354,14 @@ function updateHoveredMesh(
           break
         }
         case 'left-click': {
-          // Only toggle selection if ctrl is held.
           if (isControlPressed) {
             const key = instanceToKeyMap.get(closestInstanceId)
             if (key) {
-              const meta = imageStore.images.get(key)
-              if (meta) {
-                meta.selected = !meta.selected
-                // Make sure that if selected, the highlight remains.
-                setInstanceHighlight(closestMesh, closestInstanceId, meta.selected ? 1 : 0)
-                console.log('Left-click toggled selection:', meta)
-              }
+              imageStore.toggleSelection(key)
+              setInstanceHighlight(closestMesh, closestInstanceId, imageStore.selectedIds.has(key) ? 1 : 0)
+              console.log('Left-click toggled selection for:', key)
             }
           }
-          // Do not update lastHovered in left-click so the highlight remains.
           break
         }
         case 'right-click':
@@ -480,9 +449,7 @@ function handleMouseMove(event: MouseEvent) {
     const planeConstant = planeNormal.dot(cameraRef.value.position) + 0.2
     const t = (planeConstant - planeNormal.dot(cameraRef.value.position)) / planeNormal.dot(rayDir)
     const lassoPoint = cameraRef.value.position.clone().add(rayDir.multiplyScalar(t))
-    
     lassoShapePoints.value.push(lassoPoint.clone())
-    
     if (lassoShapePoints.value.length >= 3 && lassoShapeMesh.value) {
       const shape = new THREE.Shape()
       shape.moveTo(lassoShapePoints.value[0].x, lassoShapePoints.value[0].y)
@@ -547,7 +514,6 @@ onMounted(async () => {
   renderer.setSize(props.width, props.height)
   rendererRef.value = renderer
   
-  // Initialize lasso shape mesh (2D filled area)
   lassoShapeMesh.value = new THREE.Mesh(
     new THREE.ShapeGeometry(), 
     new THREE.MeshBasicMaterial({
@@ -591,7 +557,6 @@ onMounted(async () => {
   canvas.value?.addEventListener('mousedown', handleMouseDown)
   canvas.value?.addEventListener('mousemove', handleMouseMove)
   canvas.value?.addEventListener('mouseup', handleMouseUp)
-  // Prevent context menu on right click.
   canvas.value?.addEventListener('contextmenu', e => e.preventDefault())
   function animate() {
     requestAnimationFrame(animate)

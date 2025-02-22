@@ -2,10 +2,13 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const useImageStore = defineStore('image', () => {
-  // A Map to store image metadata.
-  // Key: image key (e.g. "bulbasaur")
-  // Value: metadata object (including any additional UI state)
+  // A Map to store image metadata (static data).
+  // Key: image id (e.g. "bulbasaur")
+  // Value: metadata object (any information you need)
   const images = ref(new Map())
+
+  const selectedIds = ref(new Set())
+  const highlightedIds = ref(new Set())
 
   // Load metadata from the JSON file and populate the store.
   async function loadImageMetadata() {
@@ -14,56 +17,86 @@ export const useImageStore = defineStore('image', () => {
       throw new Error('Failed to fetch image metadata')
     }
     const rawData = await response.json()
-    // Populate the Map with metadata and extra state.
+    const newMap = new Map()
     for (const key in rawData) {
-      images.value.set(key, {
-        ...rawData[key],
-        selected: false,
-        highlighted: false,
-      })
+      newMap.set(key, { ...rawData[key] })
     }
+    images.value = newMap
   }
 
-  // A computed property to list all image keys.
+  // Computed property to list all image ids.
   const imageKeys = computed(() => Array.from(images.value.keys()))
-  // Total number of images.
   const totalImages = computed(() => images.value.size)
 
-  // Computed property to track selected images.
+  // Computed properties to get selected and highlighted image metadata.
   const selectedImages = computed(() =>
-    Array.from(images.value.entries())
-      .filter(([key, meta]) => meta.selected)
-      .map(([key]) => key)
+    Array.from(selectedIds.value).map((id) => images.value.get(id))
   )
-
-  // Computed property to track highlighted images.
   const highlightedImages = computed(() =>
-    Array.from(images.value.entries())
-      .filter(([key, meta]) => meta.highlighted)
-      .map(([key]) => key)
+    Array.from(highlightedIds.value).map((id) => images.value.get(id))
   )
 
-  // Action to update an image's selection/highlight state.
-  function updateImageState(key, { selected, highlighted }) {
-    const meta = images.value.get(key)
-    if (meta) {
-      if (typeof selected === 'boolean') {
-        meta.selected = selected
-      }
-      if (typeof highlighted === 'boolean') {
-        meta.highlighted = highlighted
-      }
+  // Actions for selection.
+  function clearSelection() {
+    selectedIds.value.clear()
+  }
+  function addSelection(key) {
+    selectedIds.value.add(key)
+  }
+  function removeSelection(key) {
+    selectedIds.value.delete(key)
+  }
+  function toggleSelection(key) {
+    if (selectedIds.value.has(key)) {
+      selectedIds.value.delete(key)
+    } else {
+      selectedIds.value.add(key)
+    }
+  }
+  function batchSelect(keys) {
+    selectedIds.value = new Set([...selectedIds.value, ...keys])
+  }
+
+  // Actions for highlighting.
+  function clearHighlights() {
+    highlightedIds.value.clear()
+  }
+  function addHighlight(key) {
+    highlightedIds.value.add(key)
+  }
+  function batchHighlight(keys) {
+    highlightedIds.value = new Set([...highlightedIds.value, ...keys])
+  }
+  function removeHighlight(key) {
+    highlightedIds.value.delete(key)
+  }
+  function toggleHighlight(key) {
+    if (highlightedIds.value.has(key)) {
+      highlightedIds.value.delete(key)
+    } else {
+      highlightedIds.value.add(key)
     }
   }
 
   return {
     images,
+    selectedIds,
+    highlightedIds,
     loadImageMetadata,
     imageKeys,
     totalImages,
     selectedImages,
     highlightedImages,
-    updateImageState,
+    clearSelection,
+    addSelection,
+    removeSelection,
+    toggleSelection,
+    batchSelect,
+    batchHighlight,
+    clearHighlights,
+    addHighlight,
+    removeHighlight,
+    toggleHighlight,
   }
 })
 
