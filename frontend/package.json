@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.1.1",
+    "@eslint/js": "^9.21.0",
     "@iconify-json/carbon": "^1.2.6",
     "@iconify-json/twemoji": "^1.2.2",
     "@nuxt/devtools": "^2.0.0",
@@ -36,9 +37,12 @@
     "consola": "^3.4.0",
     "eslint": "^9.19.0",
     "eslint-plugin-format": "^1.0.1",
+    "eslint-plugin-vue": "^9.32.0",
+    "globals": "^16.0.0",
     "nuxt": "^3.15.4",
     "pinia": "^2.3.1",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.1",
     "vue-tsc": "^2.2.0",
     "vuetify-nuxt-module": "^0.18.3"
   },
