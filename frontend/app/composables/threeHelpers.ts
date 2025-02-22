@@ -4,7 +4,7 @@ import { ArcballControls } from 'three/addons/controls/ArcballControls.js'
 /**
  * Composable for various Three.js helper functions.
  */
-export const useThree = () => {
+export function useThree() {
   const colorMode = useColorMode()
 
   /**
@@ -40,5 +40,5 @@ export const useThree = () => {
     return controls
   }
 
-  return { setupControls}
+  return { setupControls }
 }

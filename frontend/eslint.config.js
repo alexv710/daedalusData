@@ -14,5 +14,5 @@ export default nuxt(
       '.output/',
       '.pnpm-store/',
     ],
-  }
+  },
 )
