@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import * as THREE from 'three'
 import { ArcballControls } from 'three/addons/controls/ArcballControls.js'
-import { defineExpose, defineProps, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
-import { useImageStore } from '~/stores/imageStore'
 
 // ----- Props and Refs -----
 const props = defineProps({
