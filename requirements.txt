@@ -5,3 +5,4 @@ torch
 torchvision
 scikit-learn
 tensorflow
+umap-learn
