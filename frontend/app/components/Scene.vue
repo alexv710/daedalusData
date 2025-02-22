@@ -8,8 +8,8 @@ const props = defineProps({
   height: { type: Number, required: true },
   offsetX: { type: Number, default: 0 },
 })
+
 // ----- Pinia Store Integration -----
-// Load image metadata into the store.
 const imageStore = useImageStore()
 
 // Build mapping from instance index to image key.
@@ -34,6 +34,10 @@ const dragThreshold = 5 // pixels
 // NEW: Lasso shape drawing state
 const lassoShapePoints = ref<THREE.Vector3[]>([])
 const lassoShapeMesh = shallowRef<THREE.Mesh | null>(null)
+
+// ----- Animate function variable -----
+// Declare animate in outer scope so that the watcher can call it.
+let animate = () => {}
 
 // ----- Resize Handling -----
 function handleResize() {
@@ -84,35 +88,69 @@ void main() {
 `
 
 // ----- Instanced Mesh Creation -----
-function createInstancedMesh(atlasTexture: THREE.Texture, atlasData: any): THREE.InstancedMesh {
+/**
+ * Creates an instanced mesh.
+ * @param atlasTexture The loaded texture.
+ * @param atlasData The atlas JSON data.
+ * @param projectionMap (Optional) A mapping from image key (lowercase filename) to its projection { x, y }.
+ */
+function createInstancedMesh(
+  atlasTexture: THREE.Texture,
+  atlasData: any,
+  projectionMap?: Map<string, { x: number, y: number }>,
+): THREE.InstancedMesh {
   const atlasInfoArray = Object.entries(atlasData).map(([filename, info]) => ({
-    filename,
+    filename: filename.toLowerCase(),
     ...info,
   }))
+
   const count = atlasInfoArray.length
   const geometry = new THREE.PlaneGeometry(1, 1)
   const instanceUVs = new Float32Array(count * 4)
   const instanceHighlights = new Float32Array(count)
   const instanceAspectRatios = new Float32Array(count)
   const instancePositions = new Float32Array(count * 3)
+
+  const useProjection = projectionMap && projectionMap.size > 0
+  let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity
+  if (useProjection) {
+    projectionMap.forEach((coord) => {
+      minX = Math.min(minX, coord.x)
+      maxX = Math.max(maxX, coord.x)
+      minY = Math.min(minY, coord.y)
+      maxY = Math.max(maxY, coord.y)
+    })
+  }
+  const maxRange = useProjection ? Math.max(maxX - minX, maxY - minY) : 1
+  const desiredScale = 50 // adjust as needed
+
   for (let i = 0; i < count; i++) {
     const info = atlasInfoArray[i]
+    const id = info.filename.toLowerCase().replace(/\.[^/.]+$/, "")
     const uvX = info.x / atlasTexture.image.width
     const uvWidth = info.width / atlasTexture.image.width
     const uvHeight = info.height / atlasTexture.image.height
     const uvH = -uvHeight
     const uvY = info.y / atlasTexture.image.height - uvH
     instanceUVs.set([uvX, uvY, uvWidth, uvH], i * 4)
+
     instanceHighlights[i] = 0.0
     instanceAspectRatios[i] = info.width / info.height
-    instancePositions[i * 3] = (Math.random() - 0.5) * 50 + props.offsetX
-    instancePositions[i * 3 + 1] = (Math.random() - 0.5) * 50
+
+    const coords = projectionMap!.get(id)!
+    const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale
+    const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale
+    instancePositions[i * 3] = scaledX
+    instancePositions[i * 3 + 1] = scaledY
+
     instancePositions[i * 3 + 2] = 0
   }
+
   geometry.setAttribute('instanceUV', new THREE.InstancedBufferAttribute(instanceUVs, 4))
   geometry.setAttribute('instanceHighlight', new THREE.InstancedBufferAttribute(instanceHighlights, 1))
   geometry.setAttribute('instanceAspectRatio', new THREE.InstancedBufferAttribute(instanceAspectRatios, 1))
   geometry.setAttribute('instancePosition', new THREE.InstancedBufferAttribute(instancePositions, 3))
+
   const material = new THREE.ShaderMaterial({
     uniforms: {
       map: { value: atlasTexture },
@@ -123,6 +161,7 @@ function createInstancedMesh(atlasTexture: THREE.Texture, atlasData: any): THREE
     fragmentShader,
     transparent: true,
   })
+
   const instancedMesh = new THREE.InstancedMesh(geometry, material, count)
   const matrix = new THREE.Matrix4()
   for (let i = 0; i < count; i++) {
@@ -134,6 +173,53 @@ function createInstancedMesh(atlasTexture: THREE.Texture, atlasData: any): THREE
   }
   instancedMesh.instanceMatrix.needsUpdate = true
   return instancedMesh
+}
+
+function updateInstancePositions(projectionData: { image: string, UMAP1: number, UMAP2: number }[]) {
+  if (!instancedMeshRef.value) {
+    console.warn('No instanced mesh available to update.')
+    return
+  }
+
+  console.log('Updating instance positions based on projection data...')
+
+  const projectionMap = new Map<string, { x: number, y: number }>()
+  projectionData.forEach((item) => {
+    projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
+  })
+
+  let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity
+  projectionMap.forEach((coord) => {
+    minX = Math.min(minX, coord.x)
+    maxX = Math.max(maxX, coord.x)
+    minY = Math.min(minY, coord.y)
+    maxY = Math.max(maxY, coord.y)
+  })
+
+  const rangeX = maxX - minX
+  const rangeY = maxY - minY
+  const maxRange = Math.max(rangeX, rangeY)
+  const desiredScale = 50
+
+  const mesh = instancedMeshRef.value
+  const matrix = new THREE.Matrix4()
+  const instanceCount = mesh.count
+
+  for (let i = 0; i < instanceCount; i++) {
+    const key = instanceToKeyMap.get(i)
+    if (!key)
+      continue
+
+    const coords = projectionMap.get(key.toLowerCase())
+    if (coords) {
+      const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale
+      const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale
+      matrix.makeTranslation(scaledX + props.offsetX, scaledY, 0)
+      mesh.setMatrixAt(i, matrix)
+    }
+  }
+  mesh.instanceMatrix.needsUpdate = true
+  console.log('Updated instance positions using projection data.')
 }
 
 // ----- Controls Setup -----
@@ -171,7 +257,6 @@ const instancePosition = new THREE.Vector3()
 const instanceScale = new THREE.Vector3()
 const localIntersection = new THREE.Vector3()
 
-// Update mouse vector.
 function updateMouse(event: MouseEvent) {
   event.preventDefault()
   const rect = rendererRef.value?.domElement.getBoundingClientRect()
@@ -181,17 +266,14 @@ function updateMouse(event: MouseEvent) {
   }
 }
 
-// Helper to update instance highlight.
 function setInstanceHighlight(mesh: THREE.InstancedMesh, index: number, value: number) {
   const attribute = mesh.geometry.getAttribute('instanceHighlight')
   attribute.setX(index, value)
   attribute.needsUpdate = true
 }
 
-// Reusable variables for raycasting.
 const lastHovered = { index: -1, mesh: null }
 
-// Utility: 2D point–in–polygon test (ray–casting algorithm)
 function pointInPolygon(point, polygon) {
   let inside = false
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -217,16 +299,12 @@ function updateHoveredMesh(
     console.warn('Camera is null, skipping raycasting')
     return
   }
-  // --- Lasso Mode: Only update on mouseup ---
   if (interactionType === 'lasso' && lassoDepthPoints && lassoDepthPoints.length >= 18) {
     if (!scene) {
       console.warn('Scene is null, skipping lasso raycasting')
       return
     }
-
     console.time('Lasso Total Time')
-
-    // Build a 2D lasso polygon by projecting the lasso shape points.
     console.time('Build Lasso Polygon')
     const lassoPolygon = lassoShapePoints.value.map((pt) => {
       const projected = pt.clone().project(cameraRef.value!)
@@ -236,7 +314,6 @@ function updateHoveredMesh(
       }
     })
     console.timeEnd('Build Lasso Polygon')
-
     console.time('Traverse Instanced Meshes')
     const allMeshes: THREE.InstancedMesh[] = []
     scene.traverse((obj) => {
@@ -245,7 +322,6 @@ function updateHoveredMesh(
       }
     })
     console.timeEnd('Traverse Instanced Meshes')
-
     console.time('Accumulate Selected Keys')
     const selectedKeys = new Set<string>()
     const tempMatrix = new THREE.Matrix4()
@@ -265,18 +341,14 @@ function updateHoveredMesh(
       }
     })
     console.timeEnd('Accumulate Selected Keys')
-
     console.time('Batch Update Selection')
-    // If Ctrl is not held, replace the current selection; if it is held, add to it.
     if (!isControlPressed) {
       console.log('Clearing selection')
       imageStore.clearSelection()
     }
     imageStore.batchSelect(selectedKeys)
     console.timeEnd('Batch Update Selection')
-
     console.time('Update Highlights')
-    // For each instance, update its highlight based on whether its key is in selectedIds.
     allMeshes.forEach((mesh) => {
       for (let instanceId = 0; instanceId < mesh.count; instanceId++) {
         const key = instanceToKeyMap.get(instanceId)
@@ -285,10 +357,8 @@ function updateHoveredMesh(
       }
     })
     console.timeEnd('Update Highlights')
-
     console.timeEnd('Lasso Total Time')
   }
-  // --- Standard Raycasting (Hover/Click) ---
   else {
     let closestIntersection = Infinity
     let closestMesh: THREE.InstancedMesh | null = null
@@ -374,31 +444,24 @@ function updateHoveredMesh(
 }
 
 // ----- Mouse Event Handlers -----
-// For hover and left-click, we distinguish click from drag.
 const leftClickStartPos = ref<THREE.Vector2 | null>(null)
 
 function handleMouseDown(event: MouseEvent) {
-  // If left button, record start position.
   if (event.button === 0) {
     leftClickStartPos.value = new THREE.Vector2(event.clientX, event.clientY)
     isDragging.value = false
   }
-  // If right button with ctrl pressed, enter lasso mode.
   if (event.button === 2) {
     lassoDrawing.value = true
     lassoDepthPoints.value = []
     lassoShapePoints.value = []
-    // If ctrl is not held during lasso, we want to clear selection. (Handled in updateHoveredMesh.)
     event.preventDefault()
   }
 }
 
 function handleMouseMove(event: MouseEvent) {
   updateMouse(event)
-
-  // If we are in lasso drawing mode, record depth points and update 2D lasso shape.
   if (lassoDrawing.value && cameraRef.value && rendererRef.value) {
-    // --- Record depth points (for selection) ---
     const mouseNear = new THREE.Vector3(mouseVec.x, mouseVec.y, 0)
     const mouseFar = new THREE.Vector3(mouseVec.x, mouseVec.y, 1)
     mouseNear.unproject(cameraRef.value)
@@ -411,8 +474,6 @@ function handleMouseMove(event: MouseEvent) {
       mouseFar.y,
       mouseFar.z,
     )
-
-    // --- Update 2D lasso shape ---
     const rect = rendererRef.value.domElement.getBoundingClientRect()
     const mouse = new THREE.Vector2(
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -442,21 +503,18 @@ function handleMouseMove(event: MouseEvent) {
       lassoShapeMesh.value.position.setZ(sumZ / lassoShapePoints.value.length)
     }
   }
-  // For left click, detect dragging.
   if (event.button === 0 && leftClickStartPos.value) {
     const currentPos = new THREE.Vector2(event.clientX, event.clientY)
     if (currentPos.distanceTo(leftClickStartPos.value) > dragThreshold) {
       isDragging.value = true
     }
   }
-  // If not in lasso mode and not dragging, process hover.
   if (!lassoDrawing.value && !isDragging.value) {
     updateHoveredMesh('hover', event.ctrlKey, undefined, sceneRef.value!)
   }
 }
 
 function handleMouseUp(event: MouseEvent) {
-  // If in lasso mode (right button + ctrl) and mouse up, finish lasso.
   if (lassoDrawing.value && event.button === 2) {
     updateHoveredMesh('lasso', event.ctrlKey, lassoDepthPoints.value, sceneRef.value!)
     lassoDrawing.value = false
@@ -466,7 +524,6 @@ function handleMouseUp(event: MouseEvent) {
       lassoShapeMesh.value.visible = false
     }
   }
-  // If left button was clicked (without dragging) and ctrl is held, toggle selection.
   if (event.button === 0 && !isDragging.value) {
     updateHoveredMesh('left-click', event.ctrlKey, undefined, sceneRef.value!)
   }
@@ -477,6 +534,7 @@ function handleMouseUp(event: MouseEvent) {
 // ----- Main onMounted Block -----
 onBeforeMount(async () => {
   await imageStore.loadImageMetadata()
+  await imageStore.loadProjections()
 })
 
 onMounted(async () => {
@@ -517,12 +575,35 @@ onMounted(async () => {
     const textureLoader = new THREE.TextureLoader()
     textureLoader.load(
       '/data/atlas.png',
-      (texture) => {
+      async (texture) => {
         texture.flipY = false
         console.log('Atlas texture loaded:', texture)
-        const instancedMesh = createInstancedMesh(texture, atlasData)
+        // If a current projection is set, try to fetch its data to build a projection map.
+        let projectionMap: Map<string, { x: number, y: number }> | undefined
+        if (imageStore.currentProjection) {
+          try {
+            const projResponse = await fetch(`/data/projections/${imageStore.currentProjection}`)
+            if (projResponse.ok) {
+              const projectionData = await projResponse.json()
+              projectionMap = new Map<string, { x: number, y: number }>()
+              projectionData.forEach((item: { image: string, UMAP1: number, UMAP2: number }) => {
+                projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
+              })
+            }
+            else {
+              console.warn('Failed to fetch projection data, using fallback random positions.')
+            }
+          }
+          catch (error) {
+            console.error('Error fetching projection data:', error)
+          }
+        }
+        // Create the instanced mesh using the projection map if available.
+        const instancedMesh = createInstancedMesh(texture, atlasData, projectionMap)
         instancedMeshRef.value = instancedMesh
         scene.add(instancedMesh)
+        // Start animation loop.
+        animate()
       },
       undefined,
       (error) => {
@@ -538,13 +619,38 @@ onMounted(async () => {
   canvas.value?.addEventListener('mousemove', handleMouseMove)
   canvas.value?.addEventListener('mouseup', handleMouseUp)
   canvas.value?.addEventListener('contextmenu', e => e.preventDefault())
-  function animate() {
+
+  // Define the animate function so it's available outside.
+  animate = () => {
     requestAnimationFrame(animate)
     controls.update()
     renderer.render(scene, camera)
   }
   animate()
 })
+
+// Watch for changes in the current projection and update instance positions accordingly.
+watch(
+  () => imageStore.currentProjection,
+  async (newProjFile) => {
+    if (newProjFile) {
+      try {
+        const response = await fetch(`/data/projections/${newProjFile}`)
+        if (!response.ok)
+          throw new Error('Failed to fetch projection data.')
+        const projectionData = await response.json()
+        updateInstancePositions(projectionData)
+        // Call animate() to ensure the scene updates.
+        animate()
+        console.log('Updated instance positions from projection:', newProjFile)
+      }
+      catch (error) {
+        console.error('Error loading projection data:', error)
+      }
+    }
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
