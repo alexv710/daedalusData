@@ -50,6 +50,10 @@ onMounted(async () => {
 
 <template>
   <div class="p-4">
+    <v-btn class="mb-4">
+      <NuxtLink to="/scene">Analyse Dataset</NuxtLink>
+    </v-btn>
+
     <h1 class="mb-4 text-2xl font-bold">
       Dataset Explorer
     </h1>
@@ -91,7 +95,7 @@ onMounted(async () => {
       </h2>
       <div class="grid grid-cols-2 gap-4 lg:grid-cols-6 md:grid-cols-4">
         <div
-          v-for="image in dataset.images.slice(0, 24)"
+          v-for="image in dataset.images.slice(0, 12)"
           :key="image.name"
           class="aspect-square border rounded-lg p-2 transition-shadow hover:shadow-lg"
         >
@@ -110,8 +114,8 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-      <div v-if="dataset.images.length > 24" class="mt-4 text-center text-gray-600">
-        And {{ dataset.images.length - 24 }} more images...
+      <div v-if="dataset.images.length > 12" class="mt-4 text-center text-gray-600">
+        And {{ dataset.images.length - 12 }} more images...
       </div>
 
       <!-- Metadata Preview -->
