@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "sharp": "^0.33.5",
-    "three": "^0.173.0"
+    "three": "^0.173.0",
+    "uuid": "^11.1.0"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "4.9.5"

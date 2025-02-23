@@ -12,12 +12,17 @@ const props = defineProps({
 // ----- Pinia Store Integration -----
 const imageStore = useImageStore()
 
+// vuetify theme for color mode
+const colorMode = useColorMode()
+const backgroundColor = computed(() =>
+  colorMode.value === 'dark' ? new THREE.Color().setHex(0xffffff) : new THREE.Color().setHex(0x121212),
+)
+
 // Build mapping from instance index to image key.
 const instanceToKeyMap = new Map<string, string>()
 Array.from(imageStore.images.keys()).forEach((key, i) => {
   instanceToKeyMap.set(i, key)
 })
-console.log('Instance to key map:', instanceToKeyMap)
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const cameraRef = ref<THREE.PerspectiveCamera | null>(null)
@@ -42,7 +47,6 @@ let animate = () => {}
 // ----- Resize Handling -----
 function handleResize() {
   if (cameraRef.value && rendererRef.value) {
-    console.log('Resizing scene to:', props.width, props.height)
     cameraRef.value.aspect = props.width / props.height
     cameraRef.value.updateProjectionMatrix()
     rendererRef.value.setSize(props.width, props.height)
@@ -181,8 +185,6 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
     return
   }
 
-  console.log('Updating instance positions based on projection data...')
-
   const projectionMap = new Map<string, { x: number, y: number }>()
   projectionData.forEach((item) => {
     projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
@@ -219,12 +221,11 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
     }
   }
   mesh.instanceMatrix.needsUpdate = true
-  console.log('Updated instance positions using projection data.')
 }
 
 // ----- Controls Setup -----
-function setupControls(camera: THREE.Camera, rendererElement: HTMLElement, scene: THREE.Scene): ArcballControls {
-  const controls = new ArcballControls(camera, rendererElement, scene)
+function setupControls(camera: THREE.Camera, rendererElement: HTMLElement): ArcballControls {
+  const controls = new ArcballControls(camera, rendererElement, sceneRef.value)
   controls.unsetMouseAction(0, THREE.MOUSE.ROTATE)
   controls.unsetMouseAction(0, THREE.MOUSE.PAN, 'CTRL')
   controls.unsetMouseAction(0)
@@ -293,19 +294,17 @@ function updateHoveredMesh(
   interactionType: 'hover' | 'left-click' | 'right-click' | 'lasso',
   isControlPressed: boolean,
   lassoDepthPoints?: number[],
-  scene?: THREE.Scene,
 ) {
   if (!cameraRef.value) {
     console.warn('Camera is null, skipping raycasting')
     return
   }
   if (interactionType === 'lasso' && lassoDepthPoints && lassoDepthPoints.length >= 18) {
-    if (!scene) {
+    if (!sceneRef.value) {
       console.warn('Scene is null, skipping lasso raycasting')
       return
     }
     console.time('Lasso Total Time')
-    console.time('Build Lasso Polygon')
     const lassoPolygon = lassoShapePoints.value.map((pt) => {
       const projected = pt.clone().project(cameraRef.value!)
       return {
@@ -313,16 +312,12 @@ function updateHoveredMesh(
         y: (-projected.y + 1) * 0.5 * props.height,
       }
     })
-    console.timeEnd('Build Lasso Polygon')
-    console.time('Traverse Instanced Meshes')
     const allMeshes: THREE.InstancedMesh[] = []
-    scene.traverse((obj) => {
+    sceneRef.value.traverse((obj) => {
       if (obj instanceof THREE.InstancedMesh) {
         allMeshes.push(obj)
       }
     })
-    console.timeEnd('Traverse Instanced Meshes')
-    console.time('Accumulate Selected Keys')
     const selectedKeys = new Set<string>()
     const tempMatrix = new THREE.Matrix4()
     const instancePos = new THREE.Vector3()
@@ -340,15 +335,10 @@ function updateHoveredMesh(
         }
       }
     })
-    console.timeEnd('Accumulate Selected Keys')
-    console.time('Batch Update Selection')
     if (!isControlPressed) {
-      console.log('Clearing selection')
       imageStore.clearSelection()
     }
     imageStore.batchSelect(selectedKeys)
-    console.timeEnd('Batch Update Selection')
-    console.time('Update Highlights')
     allMeshes.forEach((mesh) => {
       for (let instanceId = 0; instanceId < mesh.count; instanceId++) {
         const key = instanceToKeyMap.get(instanceId)
@@ -356,14 +346,13 @@ function updateHoveredMesh(
         setInstanceHighlight(mesh, instanceId, highlight)
       }
     })
-    console.timeEnd('Update Highlights')
     console.timeEnd('Lasso Total Time')
   }
   else {
     let closestIntersection = Infinity
     let closestMesh: THREE.InstancedMesh | null = null
     let closestInstanceId = -1
-    scene?.traverse((obj) => {
+    sceneRef.value?.traverse((obj) => {
       if (obj instanceof THREE.InstancedMesh) {
         const mesh = obj
         const instanceCount = mesh.count
@@ -510,13 +499,13 @@ function handleMouseMove(event: MouseEvent) {
     }
   }
   if (!lassoDrawing.value && !isDragging.value) {
-    updateHoveredMesh('hover', event.ctrlKey, undefined, sceneRef.value!)
+    updateHoveredMesh('hover', event.ctrlKey, undefined)
   }
 }
 
 function handleMouseUp(event: MouseEvent) {
   if (lassoDrawing.value && event.button === 2) {
-    updateHoveredMesh('lasso', event.ctrlKey, lassoDepthPoints.value, sceneRef.value!)
+    updateHoveredMesh('lasso', event.ctrlKey, lassoDepthPoints.value)
     lassoDrawing.value = false
     lassoDepthPoints.value = []
     lassoShapePoints.value = []
@@ -525,7 +514,7 @@ function handleMouseUp(event: MouseEvent) {
     }
   }
   if (event.button === 0 && !isDragging.value) {
-    updateHoveredMesh('left-click', event.ctrlKey, undefined, sceneRef.value!)
+    updateHoveredMesh('left-click', event.ctrlKey, undefined)
   }
   leftClickStartPos.value = null
   isDragging.value = false
@@ -538,13 +527,16 @@ onBeforeMount(async () => {
 })
 
 onMounted(async () => {
-  console.log('Creating scene with dimensions:', props.width, props.height)
   if (props.width <= 0 || props.height <= 0) {
     console.error('Invalid scene dimensions:', props.width, props.height)
     return
   }
-  const scene = new THREE.Scene()
-  sceneRef.value = scene
+  const color = new THREE.Color().setHex( 0x112233 );
+  console.log('three color', color)
+  sceneRef.value = new THREE.Scene()
+  console.log('color', backgroundColor.value)
+  sceneRef.value.background = backgroundColor.value
+  console.log('backgound color', sceneRef.value.background)
   const camera = new THREE.PerspectiveCamera(75, props.width / props.height, 0.1, 1000)
   camera.position.z = 50
   cameraRef.value = camera
@@ -563,21 +555,19 @@ onMounted(async () => {
   )
   lassoShapeMesh.value.frustumCulled = false
   lassoShapeMesh.value.visible = false
-  scene.add(lassoShapeMesh.value)
+  sceneRef.value.add(lassoShapeMesh.value)
 
-  const controls = setupControls(camera, renderer.domElement, scene)
+  const controls = setupControls(camera, renderer.domElement, sceneRef.value)
   try {
     const response = await fetch('/data/atlas.json')
     if (!response.ok)
       throw new Error('Failed to fetch atlas.json')
     const atlasData = await response.json()
-    console.log('Fetched atlas data:', atlasData)
     const textureLoader = new THREE.TextureLoader()
     textureLoader.load(
       '/data/atlas.png',
       async (texture) => {
         texture.flipY = false
-        console.log('Atlas texture loaded:', texture)
         // If a current projection is set, try to fetch its data to build a projection map.
         let projectionMap: Map<string, { x: number, y: number }> | undefined
         if (imageStore.currentProjection) {
@@ -601,7 +591,7 @@ onMounted(async () => {
         // Create the instanced mesh using the projection map if available.
         const instancedMesh = createInstancedMesh(texture, atlasData, projectionMap)
         instancedMeshRef.value = instancedMesh
-        scene.add(instancedMesh)
+        sceneRef.value.add(instancedMesh)
         // Start animation loop.
         animate()
       },
@@ -624,7 +614,7 @@ onMounted(async () => {
   animate = () => {
     requestAnimationFrame(animate)
     controls.update()
-    renderer.render(scene, camera)
+    renderer.render(sceneRef.value, camera)
   }
   animate()
 })
@@ -642,7 +632,6 @@ watch(
         updateInstancePositions(projectionData)
         // Call animate() to ensure the scene updates.
         animate()
-        console.log('Updated instance positions from projection:', newProjFile)
       }
       catch (error) {
         console.error('Error loading projection data:', error)
@@ -651,6 +640,10 @@ watch(
   },
   { immediate: true },
 )
+
+watch(backgroundColor, (color) => {
+  sceneRef.value!.background = color
+})
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
