@@ -17,7 +17,6 @@ const instanceToKeyMap = new Map<string, string>()
 Array.from(imageStore.images.keys()).forEach((key, i) => {
   instanceToKeyMap.set(i, key)
 })
-console.log('Instance to key map:', instanceToKeyMap)
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const cameraRef = ref<THREE.PerspectiveCamera | null>(null)
@@ -42,7 +41,6 @@ let animate = () => {}
 // ----- Resize Handling -----
 function handleResize() {
   if (cameraRef.value && rendererRef.value) {
-    console.log('Resizing scene to:', props.width, props.height)
     cameraRef.value.aspect = props.width / props.height
     cameraRef.value.updateProjectionMatrix()
     rendererRef.value.setSize(props.width, props.height)
@@ -181,8 +179,6 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
     return
   }
 
-  console.log('Updating instance positions based on projection data...')
-
   const projectionMap = new Map<string, { x: number, y: number }>()
   projectionData.forEach((item) => {
     projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
@@ -219,7 +215,6 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
     }
   }
   mesh.instanceMatrix.needsUpdate = true
-  console.log('Updated instance positions using projection data.')
 }
 
 // ----- Controls Setup -----
@@ -305,7 +300,6 @@ function updateHoveredMesh(
       return
     }
     console.time('Lasso Total Time')
-    console.time('Build Lasso Polygon')
     const lassoPolygon = lassoShapePoints.value.map((pt) => {
       const projected = pt.clone().project(cameraRef.value!)
       return {
@@ -313,16 +307,12 @@ function updateHoveredMesh(
         y: (-projected.y + 1) * 0.5 * props.height,
       }
     })
-    console.timeEnd('Build Lasso Polygon')
-    console.time('Traverse Instanced Meshes')
     const allMeshes: THREE.InstancedMesh[] = []
     scene.traverse((obj) => {
       if (obj instanceof THREE.InstancedMesh) {
         allMeshes.push(obj)
       }
     })
-    console.timeEnd('Traverse Instanced Meshes')
-    console.time('Accumulate Selected Keys')
     const selectedKeys = new Set<string>()
     const tempMatrix = new THREE.Matrix4()
     const instancePos = new THREE.Vector3()
@@ -340,15 +330,10 @@ function updateHoveredMesh(
         }
       }
     })
-    console.timeEnd('Accumulate Selected Keys')
-    console.time('Batch Update Selection')
     if (!isControlPressed) {
-      console.log('Clearing selection')
       imageStore.clearSelection()
     }
     imageStore.batchSelect(selectedKeys)
-    console.timeEnd('Batch Update Selection')
-    console.time('Update Highlights')
     allMeshes.forEach((mesh) => {
       for (let instanceId = 0; instanceId < mesh.count; instanceId++) {
         const key = instanceToKeyMap.get(instanceId)
@@ -356,7 +341,6 @@ function updateHoveredMesh(
         setInstanceHighlight(mesh, instanceId, highlight)
       }
     })
-    console.timeEnd('Update Highlights')
     console.timeEnd('Lasso Total Time')
   }
   else {
@@ -538,7 +522,6 @@ onBeforeMount(async () => {
 })
 
 onMounted(async () => {
-  console.log('Creating scene with dimensions:', props.width, props.height)
   if (props.width <= 0 || props.height <= 0) {
     console.error('Invalid scene dimensions:', props.width, props.height)
     return
@@ -571,13 +554,11 @@ onMounted(async () => {
     if (!response.ok)
       throw new Error('Failed to fetch atlas.json')
     const atlasData = await response.json()
-    console.log('Fetched atlas data:', atlasData)
     const textureLoader = new THREE.TextureLoader()
     textureLoader.load(
       '/data/atlas.png',
       async (texture) => {
         texture.flipY = false
-        console.log('Atlas texture loaded:', texture)
         // If a current projection is set, try to fetch its data to build a projection map.
         let projectionMap: Map<string, { x: number, y: number }> | undefined
         if (imageStore.currentProjection) {
@@ -642,7 +623,6 @@ watch(
         updateInstancePositions(projectionData)
         // Call animate() to ensure the scene updates.
         animate()
-        console.log('Updated instance positions from projection:', newProjFile)
       }
       catch (error) {
         console.error('Error loading projection data:', error)
