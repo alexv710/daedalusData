@@ -12,6 +12,12 @@ const props = defineProps({
 // ----- Pinia Store Integration -----
 const imageStore = useImageStore()
 
+// vuetify theme for color mode
+const colorMode = useColorMode()
+const backgroundColor = computed(() =>
+  colorMode.value === 'dark' ? new THREE.Color().setHex(0xffffff) : new THREE.Color().setHex(0x121212),
+)
+
 // Build mapping from instance index to image key.
 const instanceToKeyMap = new Map<string, string>()
 Array.from(imageStore.images.keys()).forEach((key, i) => {
@@ -218,8 +224,8 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
 }
 
 // ----- Controls Setup -----
-function setupControls(camera: THREE.Camera, rendererElement: HTMLElement, scene: THREE.Scene): ArcballControls {
-  const controls = new ArcballControls(camera, rendererElement, scene)
+function setupControls(camera: THREE.Camera, rendererElement: HTMLElement): ArcballControls {
+  const controls = new ArcballControls(camera, rendererElement, sceneRef.value)
   controls.unsetMouseAction(0, THREE.MOUSE.ROTATE)
   controls.unsetMouseAction(0, THREE.MOUSE.PAN, 'CTRL')
   controls.unsetMouseAction(0)
@@ -288,14 +294,13 @@ function updateHoveredMesh(
   interactionType: 'hover' | 'left-click' | 'right-click' | 'lasso',
   isControlPressed: boolean,
   lassoDepthPoints?: number[],
-  scene?: THREE.Scene,
 ) {
   if (!cameraRef.value) {
     console.warn('Camera is null, skipping raycasting')
     return
   }
   if (interactionType === 'lasso' && lassoDepthPoints && lassoDepthPoints.length >= 18) {
-    if (!scene) {
+    if (!sceneRef.value) {
       console.warn('Scene is null, skipping lasso raycasting')
       return
     }
@@ -308,7 +313,7 @@ function updateHoveredMesh(
       }
     })
     const allMeshes: THREE.InstancedMesh[] = []
-    scene.traverse((obj) => {
+    sceneRef.value.traverse((obj) => {
       if (obj instanceof THREE.InstancedMesh) {
         allMeshes.push(obj)
       }
@@ -347,7 +352,7 @@ function updateHoveredMesh(
     let closestIntersection = Infinity
     let closestMesh: THREE.InstancedMesh | null = null
     let closestInstanceId = -1
-    scene?.traverse((obj) => {
+    sceneRef.value?.traverse((obj) => {
       if (obj instanceof THREE.InstancedMesh) {
         const mesh = obj
         const instanceCount = mesh.count
@@ -494,13 +499,13 @@ function handleMouseMove(event: MouseEvent) {
     }
   }
   if (!lassoDrawing.value && !isDragging.value) {
-    updateHoveredMesh('hover', event.ctrlKey, undefined, sceneRef.value!)
+    updateHoveredMesh('hover', event.ctrlKey, undefined)
   }
 }
 
 function handleMouseUp(event: MouseEvent) {
   if (lassoDrawing.value && event.button === 2) {
-    updateHoveredMesh('lasso', event.ctrlKey, lassoDepthPoints.value, sceneRef.value!)
+    updateHoveredMesh('lasso', event.ctrlKey, lassoDepthPoints.value)
     lassoDrawing.value = false
     lassoDepthPoints.value = []
     lassoShapePoints.value = []
@@ -509,7 +514,7 @@ function handleMouseUp(event: MouseEvent) {
     }
   }
   if (event.button === 0 && !isDragging.value) {
-    updateHoveredMesh('left-click', event.ctrlKey, undefined, sceneRef.value!)
+    updateHoveredMesh('left-click', event.ctrlKey, undefined)
   }
   leftClickStartPos.value = null
   isDragging.value = false
@@ -526,8 +531,12 @@ onMounted(async () => {
     console.error('Invalid scene dimensions:', props.width, props.height)
     return
   }
-  const scene = new THREE.Scene()
-  sceneRef.value = scene
+  const color = new THREE.Color().setHex( 0x112233 );
+  console.log('three color', color)
+  sceneRef.value = new THREE.Scene()
+  console.log('color', backgroundColor.value)
+  sceneRef.value.background = backgroundColor.value
+  console.log('backgound color', sceneRef.value.background)
   const camera = new THREE.PerspectiveCamera(75, props.width / props.height, 0.1, 1000)
   camera.position.z = 50
   cameraRef.value = camera
@@ -546,9 +555,9 @@ onMounted(async () => {
   )
   lassoShapeMesh.value.frustumCulled = false
   lassoShapeMesh.value.visible = false
-  scene.add(lassoShapeMesh.value)
+  sceneRef.value.add(lassoShapeMesh.value)
 
-  const controls = setupControls(camera, renderer.domElement, scene)
+  const controls = setupControls(camera, renderer.domElement, sceneRef.value)
   try {
     const response = await fetch('/data/atlas.json')
     if (!response.ok)
@@ -582,7 +591,7 @@ onMounted(async () => {
         // Create the instanced mesh using the projection map if available.
         const instancedMesh = createInstancedMesh(texture, atlasData, projectionMap)
         instancedMeshRef.value = instancedMesh
-        scene.add(instancedMesh)
+        sceneRef.value.add(instancedMesh)
         // Start animation loop.
         animate()
       },
@@ -605,7 +614,7 @@ onMounted(async () => {
   animate = () => {
     requestAnimationFrame(animate)
     controls.update()
-    renderer.render(scene, camera)
+    renderer.render(sceneRef.value, camera)
   }
   animate()
 })
@@ -631,6 +640,10 @@ watch(
   },
   { immediate: true },
 )
+
+watch(backgroundColor, (color) => {
+  sceneRef.value!.background = color
+})
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
