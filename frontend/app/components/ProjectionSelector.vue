@@ -1,36 +1,40 @@
-<script setup>
+<script setup lang="ts">
+import { useImageStore } from '@/stores/imageStore'
+import { onMounted, ref } from 'vue'
+
 const imageStore = useImageStore()
-const availableProjections = ref([])
-const selectedProjection = ref(null)
+const selectedProjection = ref('')
 
 onMounted(async () => {
-  // Load available projections from the store.
   await imageStore.loadProjections()
-  availableProjections.value = imageStore.availableProjections
-  // Set the default selection to the first available projection.
-  if (availableProjections.value.length) {
-    selectedProjection.value = availableProjections.value[0]
+  if (imageStore.availableProjections.length) {
+    selectedProjection.value = imageStore.availableProjections[0]
     imageStore.selectProjection(selectedProjection.value)
   }
 })
 
-// When the selection changes, update the store.
-function onSelect(value) {
+function onSelect(value: string) {
+  selectedProjection.value = value
   imageStore.selectProjection(value)
 }
 </script>
 
 <template>
-  <v-card outlined class="ma-4 pa-4">
-    <v-card-title>Select Projection</v-card-title>
-    <v-card-text>
+  <v-card outlined class="ma-0 pa-0" max-width="300">
+    <v-card-title class="text-h6 ma-0 pa-1">
+      Projection
+    </v-card-title>
+    <v-card-text class="ma-0 pa-1">
       <v-select
-        label="Projection"
-        :items="availableProjections"
         v-model="selectedProjection"
-        @update:modelValue="onSelect"
+        dense
+        hide-details
+        label="Select Projection"
+        :items="imageStore.availableProjections"
         clearable
-      ></v-select>
+        @update:model-value="onSelect"
+        class="ma-0 pa-0"
+      />
     </v-card-text>
   </v-card>
 </template>
