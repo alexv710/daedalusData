@@ -25,21 +25,22 @@ onMounted(() => {
     }
   }
 })
+
+definePageMeta({
+  layout: 'minimal',
+})
 </script>
 
 <template>
-  <div>
-    <ProjectionSelector />
-    <div
-      ref="sceneContainer"
-      class="h-screen bg-green"
-    >
-      <Scene
-        v-if="containerSize.width > 0 && containerSize.height > 0 && currentProjection"
-        ref="sceneRef"
-        :height="containerSize.height"
-        :width="containerSize.width"
-      />
-    </div>
+  <div
+    ref="sceneContainer"
+    class="h-screen"
+  >
+    <Scene
+      v-if="containerSize.width > 0 && containerSize.height > 0 && currentProjection"
+      ref="sceneRef"
+      :height="containerSize.height"
+      :width="containerSize.width"
+    />
   </div>
 </template>
