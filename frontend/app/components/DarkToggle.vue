@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const color = useColorMode()
+const theme = useTheme()
 
 useHead({
   meta: [{
@@ -11,6 +12,7 @@ useHead({
 
 function toggleDark() {
   color.preference = color.value === 'dark' ? 'light' : 'dark'
+  theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark'
 }
 </script>
 
