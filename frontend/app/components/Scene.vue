@@ -203,9 +203,8 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
   const maxRange = Math.max(rangeX, rangeY)
   const desiredScale = 50
 
-  const mesh = instancedMeshRef.value
   const matrix = new THREE.Matrix4()
-  const instanceCount = mesh.count
+  const instanceCount = instancedMeshRef.value.count
 
   for (let i = 0; i < instanceCount; i++) {
     const key = instanceToKeyMap.get(i)
@@ -217,10 +216,10 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
       const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale
       const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale
       matrix.makeTranslation(scaledX + props.offsetX, scaledY, 0)
-      mesh.setMatrixAt(i, matrix)
+      instancedMeshRef.value.setMatrixAt(i, matrix)
     }
   }
-  mesh.instanceMatrix.needsUpdate = true
+  instancedMeshRef.value.instanceMatrix.needsUpdate = true
 }
 
 // ----- Controls Setup -----
@@ -531,12 +530,8 @@ onMounted(async () => {
     console.error('Invalid scene dimensions:', props.width, props.height)
     return
   }
-  const color = new THREE.Color().setHex( 0x112233 );
-  console.log('three color', color)
   sceneRef.value = new THREE.Scene()
-  console.log('color', backgroundColor.value)
   sceneRef.value.background = backgroundColor.value
-  console.log('backgound color', sceneRef.value.background)
   const camera = new THREE.PerspectiveCamera(75, props.width / props.height, 0.1, 1000)
   camera.position.z = 50
   cameraRef.value = camera
