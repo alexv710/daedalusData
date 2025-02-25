@@ -61,7 +61,7 @@ const groupedCharts = computed(() => {
         v-model="drawerLeft"
         permanent
         location="left"
-        width="300"
+        width="400"
         class="scrollable pa-0"
       >
         <v-list dense class="pa-0">
