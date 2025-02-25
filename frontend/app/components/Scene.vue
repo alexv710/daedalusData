@@ -14,8 +14,7 @@ const imageStore = useImageStore()
 
 // vuetify theme for color mode
 const colorMode = useColorMode()
-const backgroundColor = computed(() =>
-  colorMode.value === 'dark' ? new THREE.Color().setHex(0xffffff) : new THREE.Color().setHex(0x121212),
+const backgroundColor = computed(() => colorMode.value === 'light' ? new THREE.Color().setHex(0xffffff) : new THREE.Color().setHex(0x121212),
 )
 
 // Build mapping from instance index to image key.
