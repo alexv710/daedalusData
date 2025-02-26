@@ -36,6 +36,93 @@ export const useImageStore = defineStore('image', () => {
     Array.from(highlightedIds.value).map(id => images.value.get(id)),
   )
 
+  // Get all available attributes from images
+  const availableAttributes = computed(() => {
+    const attributes = new Set<string>()
+
+    images.value.forEach((img) => {
+      if (!img)
+        return
+
+      Object.keys(img).forEach((key) => {
+        if (key !== 'name' && key !== 'id') {
+          attributes.add(key)
+        }
+      })
+    })
+
+    return Array.from(attributes).sort()
+  })
+
+  // Get attributes formatted for v-select components
+  const attributeItems = computed(() => {
+    return availableAttributes.value.map(attr => ({
+      title: attr,
+      value: attr,
+    }))
+  })
+
+  // Get all numeric attributes (for violin plots)
+  const availableNumericAttributes = computed(() => {
+    const numericAttributes = new Set<string>()
+
+    // We need at least some images to check
+    if (images.value.size === 0)
+      return []
+
+    // Filter for attributes that contain numeric values
+    availableAttributes.value.forEach((attr) => {
+      // Check if at least one image has a numeric value for this attribute
+      let hasNumeric = false
+
+      for (const img of images.value.values()) {
+        if (img && typeof img[attr] === 'number' && !isNaN(img[attr])) {
+          hasNumeric = true
+          break
+        }
+      }
+
+      if (hasNumeric) {
+        numericAttributes.add(attr)
+      }
+    })
+
+    return Array.from(numericAttributes).sort()
+  })
+
+  // Calculated attribute data for count charts
+  const attributeChartData = computed(() => {
+    const groups: Record<string, Record<string, number>> = {}
+
+    // Loop over each selected image
+    selectedImages.value.forEach((img) => {
+      if (!img)
+        return
+
+      // For every property in the image, except name or id
+      Object.keys(img).forEach((key) => {
+        if (key === 'name' || key === 'id')
+          return
+
+        const value = img[key] ?? 'unknown'
+        if (!groups[key])
+          groups[key] = {}
+        groups[key][value] = (groups[key][value] || 0) + 1
+      })
+    })
+
+    // Convert the counts for each attribute into an array suitable for the chart
+    const result: Record<string, Array<{ value: string, count: number }>> = {}
+    Object.keys(groups).forEach((attribute) => {
+      result[attribute] = Object.entries(groups[attribute]).map(([val, count]) => ({
+        value: val,
+        count,
+      }))
+    })
+
+    return result
+  })
+
   // Actions for selection.
   function clearSelection() {
     selectedIds.value.clear()
@@ -134,6 +221,10 @@ export const useImageStore = defineStore('image', () => {
     availableProjections,
     loadProjections,
     selectProjection,
+    availableAttributes,
+    attributeItems,
+    availableNumericAttributes,
+    attributeChartData,
   }
 })
 
