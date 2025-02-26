@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { appName } from '~/constants'
 
+const color = useColorMode()
+const theme = useTheme()
+
 useHead({
   title: appName,
+})
+
+onMounted(() => {
+  theme.global.name.value = color.value
 })
 </script>
 
