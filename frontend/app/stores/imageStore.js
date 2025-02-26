@@ -99,7 +99,8 @@ export const useImageStore = defineStore('image', () => {
       if (manifest.length > 0) {
         currentProjection.value = manifest[0]
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Error loading projections:', error)
       availableProjections.value = []
       currentProjection.value = null
