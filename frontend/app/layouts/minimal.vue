@@ -1,38 +1,91 @@
 <script setup lang="ts">
 const drawerLeft = ref(true)
 const drawerRight = ref(true)
+const activeTab = ref(0)
 
 const imageStore = useImageStore()
+const colorMode = useColorMode()
 
-// Compute the data for the boxplot chart.
+// State for tracking visible charts
+const visibleBoxPlots = ref<string[]>([])
+const violinChartCount = ref(0)
+
+// Color palettes for the theme
+const colorPalettes = {
+  light: [
+    '#3b82f6', // blue-500
+    '#8b5cf6', // violet-500
+    '#14b8a6', // teal-500
+    '#f97316', // orange-500
+    '#06b6d4', // cyan-500
+    '#ec4899', // pink-500
+    '#10b981', // emerald-500
+    '#6366f1', // indigo-500
+    '#f59e0b', // amber-500
+    '#a855f7', // purple-500
+  ],
+  dark: [
+    '#60a5fa', // blue-400
+    '#a78bfa', // violet-400
+    '#2dd4bf', // teal-400
+    '#fb923c', // orange-400
+    '#22d3ee', // cyan-400
+    '#f472b6', // pink-400
+    '#34d399', // emerald-400
+    '#818cf8', // indigo-400
+    '#fbbf24', // amber-400
+    '#c084fc', // purple-400
+  ],
+}
+
+// Get colors based on the current theme
+const chartColors = computed(() => {
+  return colorMode.value === 'dark' ? colorPalettes.dark : colorPalettes.light
+})
+
+// Get attributes that aren't already shown
+const availableBoxPlotAttributes = computed(() => {
+  return imageStore.attributeItems.filter(attr => !visibleBoxPlots.value.includes(attr.value))
+})
+
+// Use the attribute chart data directly from the store
 const groupedCharts = computed(() => {
-  const groups: Record<string, Record<string, number>> = {}
+  const allData = imageStore.attributeChartData
 
-  // Loop over each selected image
-  imageStore.selectedImages.forEach((img) => {
-    if (!img)
-      return
-    // For every property in the image, except name or id
-    Object.keys(img).forEach((key) => {
-      if (key === 'name' || key === 'id')
-        return
-      const value = img[key] ?? 'unknown'
-      if (!groups[key])
-        groups[key] = {}
-      groups[key][value] = (groups[key][value] || 0) + 1
-    })
+  // Filter to only include the attributes that are visible
+  const result = {}
+  visibleBoxPlots.value.forEach((attr) => {
+    if (allData[attr]) {
+      result[attr] = allData[attr]
+    }
   })
 
-  // Convert the counts for each attribute into an array suitable for the chart
-  const result: Record<string, Array<{ value: string, count: number }>> = {}
-  Object.keys(groups).forEach((attribute) => {
-    result[attribute] = Object.entries(groups[attribute]).map(([val, count]) => ({
-      value: val,
-      count,
-    }))
-  })
   return result
 })
+
+// Add a new boxplot chart
+function addBoxPlotChart(attribute) {
+  if (!visibleBoxPlots.value.includes(attribute.value)) {
+    visibleBoxPlots.value.push(attribute.value)
+  }
+}
+
+// Remove a boxplot chart
+function removeBoxPlotChart(attribute) {
+  visibleBoxPlots.value = visibleBoxPlots.value.filter(attr => attr !== attribute)
+}
+
+// Add a new violin chart
+function addViolinChart() {
+  violinChartCount.value++
+}
+
+// Remove a violin chart
+function removeViolinChart(index) {
+  if (violinChartCount.value > 0) {
+    violinChartCount.value--
+  }
+}
 </script>
 
 <template>
@@ -93,22 +146,106 @@ const groupedCharts = computed(() => {
         v-model="drawerRight"
         permanent
         location="right"
-        class="pa-0"
+        width="400"
+        class="pa-2"
       >
-        <div
-          v-for="(data, attribute) in groupedCharts"
-          :key="attribute"
-          class="mb-6"
-        >
-          <h3 class="mb-2 text-lg font-bold">
-            {{ attribute }}
-          </h3>
-          <BoxPlotChart
-            :data="data"
-            x-label="Value"
-            y-label="Count"
-          />
-        </div>
+        <v-card flat>
+          <v-tabs v-model="activeTab" grow>
+            <v-tab value="0">
+              Counts
+            </v-tab>
+            <v-tab value="1">
+              Distributions
+            </v-tab>
+          </v-tabs>
+
+          <v-window v-model="activeTab">
+            <!-- Count Charts Tab -->
+            <v-window-item value="0">
+              <div class="scrollable p-2">
+                <!-- Add Chart Button -->
+                <div class="mb-4 flex justify-center">
+                  <AddChartDialog
+                    chart-type="boxplot"
+                    :available-attributes="availableBoxPlotAttributes"
+                    @add-chart="addBoxPlotChart"
+                  />
+                </div>
+
+                <!-- No charts message -->
+                <div v-if="visibleBoxPlots.length === 0" class="py-8 text-center text-gray-500">
+                  <v-icon color="grey" size="large">
+                    mdi-chart-bell-curve
+                  </v-icon>
+                  <p class="mt-2">
+                    Click "Add Chart" to visualize attribute counts.
+                  </p>
+                </div>
+
+                <!-- Box plot charts -->
+                <template v-for="attribute in visibleBoxPlots" :key="attribute">
+                  <ChartWrapper
+                    :title="attribute"
+                    :show-remove-button="true"
+                    @remove="removeBoxPlotChart(attribute)"
+                  >
+                    <BoxPlotChart
+                      v-if="groupedCharts[attribute]"
+                      :data="groupedCharts[attribute]"
+                      x-label=""
+                      y-label="Count"
+                      :colors="chartColors"
+                      :aspect-ratio="2"
+                    />
+                    <div v-else class="py-4 text-center text-gray-500">
+                      No data available for this attribute
+                    </div>
+                  </ChartWrapper>
+                </template>
+              </div>
+            </v-window-item>
+
+            <!-- Distribution Analysis Tab -->
+            <v-window-item value="1">
+              <div class="scrollable p-2">
+                <!-- Add Violin Chart Button -->
+                <div class="mb-4 flex justify-center">
+                  <AddChartDialog
+                    chart-type="violin"
+                    @add-chart="addViolinChart"
+                  />
+                </div>
+
+                <!-- No charts message -->
+                <div v-if="violinChartCount === 0" class="py-8 text-center text-gray-500">
+                  <v-icon color="grey" size="large">
+                    mdi-chart-bell-curve
+                  </v-icon>
+                  <p class="mt-2">
+                    Click "Add Chart" to visualize attribute counts.
+                  </p>
+                </div>
+
+                <!-- Violin charts -->
+                <template v-for="i in violinChartCount" :key="`violin-${i}`">
+                  <ChartWrapper
+                    :title="`Distribution Analysis ${i}`"
+                    :show-remove-button="true"
+                    @remove="removeViolinChart(i)"
+                  >
+                    <TwoAttributeViolinPlot
+                      :data="imageStore.selectedImages"
+                      :color-mode="colorMode"
+                      :show-violin="true"
+                      :show-box-plot="true"
+                      :show-data-points="false"
+                    />
+                  </ChartWrapper>
+                </template>
+              </div>
+            </v-window-item>
+          </v-window>
+        </v-card>
       </v-navigation-drawer>
     </v-layout>
   </v-app>
@@ -117,5 +254,6 @@ const groupedCharts = computed(() => {
 <style scoped>
 .scrollable {
   overflow-y: auto;
+  max-height: calc(100vh - 120px);
 }
 </style>
