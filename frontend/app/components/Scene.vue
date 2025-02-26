@@ -14,15 +14,11 @@ const imageStore = useImageStore()
 
 // vuetify theme for color mode
 const colorMode = useColorMode()
-const backgroundColor = computed(() =>
-  colorMode.value === 'dark' ? new THREE.Color().setHex(0xffffff) : new THREE.Color().setHex(0x121212),
+const backgroundColor = computed(() => colorMode.value === 'light' ? new THREE.Color().setHex(0xFFFFFF) : new THREE.Color().setHex(0x121212),
 )
 
 // Build mapping from instance index to image key.
-const instanceToKeyMap = new Map<string, string>()
-Array.from(imageStore.images.keys()).forEach((key, i) => {
-  instanceToKeyMap.set(i, key)
-})
+const instanceToKeyMap = ref(new Map<number, string>())
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const cameraRef = ref<THREE.PerspectiveCamera | null>(null)
@@ -30,11 +26,23 @@ const rendererRef = ref<THREE.WebGLRenderer | null>(null)
 const sceneRef = shallowRef<THREE.Scene | null>(null)
 const instancedMeshRef = shallowRef<THREE.InstancedMesh | null>(null)
 
+// ----- Raycasting & Lasso Handling -----
+const raycaster = new THREE.Raycaster()
+const mouseVec = new THREE.Vector2(1, 1)
+const frustum = new THREE.Frustum()
+const projScreenMatrix = new THREE.Matrix4()
+const boundingBox = new THREE.Box3()
+const instancePosition = new THREE.Vector3()
+const instanceScale = new THREE.Vector3()
+const localIntersection = new THREE.Vector3()
+
 // ----- Additional State for Interaction -----
 const lassoDrawing = ref(false)
 const lassoDepthPoints = ref<number[]>([])
 const isDragging = ref(false)
-const dragThreshold = 5 // pixels
+const dragThreshold = 5
+const lastHovered = { index: -1, mesh: null }
+const leftClickStartPos = ref<THREE.Vector2 | null>(null)
 
 // NEW: Lasso shape drawing state
 const lassoShapePoints = ref<THREE.Vector3[]>([])
@@ -116,7 +124,10 @@ function createInstancedMesh(
   const instancePositions = new Float32Array(count * 3)
 
   const useProjection = projectionMap && projectionMap.size > 0
-  let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
   if (useProjection) {
     projectionMap.forEach((coord) => {
       minX = Math.min(minX, coord.x)
@@ -130,7 +141,7 @@ function createInstancedMesh(
 
   for (let i = 0; i < count; i++) {
     const info = atlasInfoArray[i]
-    const id = info.filename.toLowerCase().replace(/\.[^/.]+$/, "")
+    const id = info.filename.toLowerCase().replace(/\.[^/.]+$/, '')
     const uvX = info.x / atlasTexture.image.width
     const uvWidth = info.width / atlasTexture.image.width
     const uvHeight = info.height / atlasTexture.image.height
@@ -190,7 +201,10 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
     projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
   })
 
-  let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
   projectionMap.forEach((coord) => {
     minX = Math.min(minX, coord.x)
     maxX = Math.max(maxX, coord.x)
@@ -203,12 +217,11 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
   const maxRange = Math.max(rangeX, rangeY)
   const desiredScale = 50
 
-  const mesh = instancedMeshRef.value
   const matrix = new THREE.Matrix4()
-  const instanceCount = mesh.count
+  const instanceCount = instancedMeshRef.value.count
 
   for (let i = 0; i < instanceCount; i++) {
-    const key = instanceToKeyMap.get(i)
+    const key = instanceToKeyMap.value.get(i)
     if (!key)
       continue
 
@@ -217,10 +230,10 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
       const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale
       const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale
       matrix.makeTranslation(scaledX + props.offsetX, scaledY, 0)
-      mesh.setMatrixAt(i, matrix)
+      instancedMeshRef.value.setMatrixAt(i, matrix)
     }
   }
-  mesh.instanceMatrix.needsUpdate = true
+  instancedMeshRef.value.instanceMatrix.needsUpdate = true
 }
 
 // ----- Controls Setup -----
@@ -248,16 +261,6 @@ function setupControls(camera: THREE.Camera, rendererElement: HTMLElement): Arcb
   return controls
 }
 
-// ----- Raycasting & Lasso Handling -----
-const raycaster = new THREE.Raycaster()
-const mouseVec = new THREE.Vector2(1, 1)
-const frustum = new THREE.Frustum()
-const projScreenMatrix = new THREE.Matrix4()
-const boundingBox = new THREE.Box3()
-const instancePosition = new THREE.Vector3()
-const instanceScale = new THREE.Vector3()
-const localIntersection = new THREE.Vector3()
-
 function updateMouse(event: MouseEvent) {
   event.preventDefault()
   const rect = rendererRef.value?.domElement.getBoundingClientRect()
@@ -272,8 +275,6 @@ function setInstanceHighlight(mesh: THREE.InstancedMesh, index: number, value: n
   attribute.setX(index, value)
   attribute.needsUpdate = true
 }
-
-const lastHovered = { index: -1, mesh: null }
 
 function pointInPolygon(point, polygon) {
   let inside = false
@@ -329,7 +330,7 @@ function updateHoveredMesh(
         const sx = (screenPos.x + 1) * 0.5 * props.width
         const sy = (-screenPos.y + 1) * 0.5 * props.height
         if (pointInPolygon({ x: sx, y: sy }, lassoPolygon)) {
-          const key = instanceToKeyMap.get(instanceId)
+          const key = instanceToKeyMap.value.get(instanceId)
           if (key)
             selectedKeys.add(key)
         }
@@ -341,7 +342,7 @@ function updateHoveredMesh(
     imageStore.batchSelect(selectedKeys)
     allMeshes.forEach((mesh) => {
       for (let instanceId = 0; instanceId < mesh.count; instanceId++) {
-        const key = instanceToKeyMap.get(instanceId)
+        const key = instanceToKeyMap.value.get(instanceId)
         const highlight = (key && imageStore.selectedIds.has(key)) ? 1 : 0
         setInstanceHighlight(mesh, instanceId, highlight)
       }
@@ -395,7 +396,7 @@ function updateHoveredMesh(
     frustum.setFromProjectionMatrix(projScreenMatrix)
     raycaster.setFromCamera(mouseVec, cameraRef.value!)
     if (lastHovered.index !== -1 && lastHovered.mesh) {
-      const key = instanceToKeyMap.get(lastHovered.index)
+      const key = instanceToKeyMap.value.get(lastHovered.index)
       if (!key || !imageStore.selectedIds.has(key)) {
         setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
       }
@@ -405,7 +406,7 @@ function updateHoveredMesh(
     if (closestMesh && closestInstanceId !== -1) {
       switch (interactionType) {
         case 'hover': {
-          const key = instanceToKeyMap.get(closestInstanceId)
+          const key = instanceToKeyMap.value.get(closestInstanceId)
           if (!key || !imageStore.selectedIds.has(key)) {
             setInstanceHighlight(closestMesh, closestInstanceId, 1)
           }
@@ -415,7 +416,7 @@ function updateHoveredMesh(
         }
         case 'left-click': {
           if (isControlPressed) {
-            const key = instanceToKeyMap.get(closestInstanceId)
+            const key = instanceToKeyMap.value.get(closestInstanceId)
             if (key) {
               imageStore.toggleSelection(key)
               setInstanceHighlight(closestMesh, closestInstanceId, imageStore.selectedIds.has(key) ? 1 : 0)
@@ -433,8 +434,6 @@ function updateHoveredMesh(
 }
 
 // ----- Mouse Event Handlers -----
-const leftClickStartPos = ref<THREE.Vector2 | null>(null)
-
 function handleMouseDown(event: MouseEvent) {
   if (event.button === 0) {
     leftClickStartPos.value = new THREE.Vector2(event.clientX, event.clientY)
@@ -527,16 +526,24 @@ onBeforeMount(async () => {
 })
 
 onMounted(async () => {
+  if (imageStore.images.size === 0) {
+    await imageStore.loadImageMetadata()
+    await imageStore.loadProjections()
+  }
+
+  const newMap = new Map<number, string>()
+  Array.from(imageStore.images.keys()).forEach((key, i) => {
+    newMap.set(i, key)
+  })
+  instanceToKeyMap.value = newMap
+  console.log('Instance to key map:', instanceToKeyMap.value)
+
   if (props.width <= 0 || props.height <= 0) {
     console.error('Invalid scene dimensions:', props.width, props.height)
     return
   }
-  const color = new THREE.Color().setHex( 0x112233 );
-  console.log('three color', color)
   sceneRef.value = new THREE.Scene()
-  console.log('color', backgroundColor.value)
   sceneRef.value.background = backgroundColor.value
-  console.log('backgound color', sceneRef.value.background)
   const camera = new THREE.PerspectiveCamera(75, props.width / props.height, 0.1, 1000)
   camera.position.z = 50
   cameraRef.value = camera
@@ -625,6 +632,8 @@ watch(
   async (newProjFile) => {
     if (newProjFile) {
       try {
+        // pause here for 2 seconds
+        await new Promise(resolve => setTimeout(resolve, 4000))
         const response = await fetch(`/data/projections/${newProjFile}`)
         if (!response.ok)
           throw new Error('Failed to fetch projection data.')
@@ -638,7 +647,6 @@ watch(
       }
     }
   },
-  { immediate: true },
 )
 
 watch(backgroundColor, (color) => {
