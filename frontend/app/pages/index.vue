@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-
 interface FileInfo {
   name: string
   size: number
@@ -32,17 +30,17 @@ function generateAtlas() {
   fetch('/api/atlasGenerator', {
     method: 'POST',
   })
-    .then(res => {
+    .then((res) => {
       if (!res.ok)
         throw new Error('Failed to generate atlas')
       return res.json()
     })
-    .then(data => {
+    .then((data) => {
       console.log('Atlas generated:', data)
       // Optionally re-check if the atlas now exists
       checkAtlasExists()
     })
-    .catch(e => {
+    .catch((e) => {
       console.error('Failed to generate atlas:', e)
     })
 }
@@ -50,7 +48,7 @@ function generateAtlas() {
 function checkAtlasExists() {
   // Perform a HEAD request to check for the atlas file
   fetch('/data/atlas.png', { method: 'HEAD' })
-    .then(res => {
+    .then((res) => {
       atlasExists.value = res.ok
     })
     .catch(() => {
