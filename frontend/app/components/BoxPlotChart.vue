@@ -193,9 +193,9 @@ function drawAxes(g: d3.Selection<SVGGElement, unknown, null, undefined>) {
 function handleXAxisLabels(xAxisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) {
   // Dynamic font size based on bar count and width
   const fontSize = Math.min(
-    12, // Max font size
+    12,
     Math.max(
-      8, // Min font size
+      8,
       Math.floor(x.value.bandwidth() / 5),
     ),
   )
@@ -243,7 +243,7 @@ function drawBars(g: d3.Selection<SVGGElement, unknown, null, undefined>) {
     .duration(750)
     .delay((_, i) => i * 30)
     .attr('y', d => y.value(d.count))
-    .attr('height', d => height.value - y.value(d.count))
+    .attr('height', d => Math.max(0, height.value - y.value(d.count)))
 }
 
 // Tooltip handlers
