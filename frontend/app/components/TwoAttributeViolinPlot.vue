@@ -35,7 +35,7 @@ const props = defineProps({
     default: 50,
   },
   colors: {
-    type: [Function, Array, Object],
+    type: [Function, Array],
     default: null,
   },
   aspectRatio: {
@@ -82,7 +82,7 @@ const isSelectedXNumeric = computed(() => {
   return imageStore.availableNumericAttributes.includes(selectedXAttribute.value)
 })
 
-// Chart dimensions - adjusted to use full width
+// Chart dimensions
 const margin = { top: 15, right: 25, bottom: 50, left: 30 }
 const width = computed(() => (chartContainer.value?.clientWidth || 0) - margin.left - margin.right)
 const height = computed(() => (chartContainer.value?.clientHeight || 0) - margin.top - margin.bottom)
@@ -118,7 +118,12 @@ const colorPalettes = {
   ],
 }
 
-// Create a color function
+// Get correct color array based on theme
+const chartColors = computed(() => {
+  return isDarkMode.value ? colorPalettes.dark : colorPalettes.light
+})
+
+// Create a color function based on the props or default theme colors
 const colorFunct = computed(() => {
   if (typeof props.colors === 'function') {
     return props.colors
@@ -127,9 +132,7 @@ const colorFunct = computed(() => {
     return d3.scaleOrdinal().range(props.colors)
   }
   else {
-    // Use our professional color palette based on theme
-    const palette = isDarkMode.value ? colorPalettes.dark : colorPalettes.light
-    return d3.scaleOrdinal().range(palette)
+    return d3.scaleOrdinal().range(chartColors.value)
   }
 })
 
@@ -310,7 +313,6 @@ function addGridLines(g, width, height, yScale) {
     .attr('stroke-dasharray', '2,2')
 }
 
-// ... rest of the component functions remain the same ...
 function drawViolinPlots(g, groupedData, xScale, yScale, xAttr) {
   groupedData.forEach((groupData, key) => {
     const values = groupData.map(d => d[selectedYAttribute.value])
@@ -359,14 +361,18 @@ function drawBoxPlots(g, groupedData, xScale, yScale, xAttr) {
     const interQuantileRange = q3 - q1
     const min = Math.max(q1 - 1.5 * interQuantileRange, d3.min(values))
     const max = Math.min(q3 + 1.5 * interQuantileRange, d3.max(values))
+    const y1 = yScale(q1)
+    const y3 = yScale(q3)
+    const boxY = Math.min(y1, y3)
+    const boxHeight = Math.abs(y1 - y3)
 
     const boxWidth = xScale.bandwidth() * (props.boxPlotWidth / 100)
 
     // Box
     g.append('rect')
       .attr('x', xScale(key) + (xScale.bandwidth() - boxWidth) / 2)
-      .attr('y', yScale(q3))
-      .attr('height', yScale(q1) - yScale(q3))
+      .attr('y', boxY)
+      .attr('height', boxHeight || 1)
       .attr('width', boxWidth)
       .attr('stroke', isDarkMode.value ? '#e2e8f0' : '#1a202c')
       .attr('stroke-width', 1.5)
@@ -632,7 +638,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-  .tooltip {
+.tooltip {
   pointer-events: none;
   z-index: 100;
   max-width: 250px;
