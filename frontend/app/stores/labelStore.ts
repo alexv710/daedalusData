@@ -1,5 +1,4 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
-import { computed, ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 
 export interface Label {
@@ -7,6 +6,7 @@ export interface Label {
   value: string
   color?: string
   description?: string
+  images?: string[]
 }
 
 export interface LabelAlphabet {
@@ -25,6 +25,18 @@ export const useLabelStore = defineStore('labels', () => {
   // --- State ---
   const manifest = ref([] as string[])
   const alphabets = ref([] as LabelAlphabet[])
+  const selectedLabelId = ref<string | null>(null)
+  const selectedAlphabetId = ref<string | null>(null)
+
+  // --- Computed ---
+  const selectedLabel = computed(() => {
+    if (!selectedLabelId.value || !selectedAlphabetId.value)
+      return null
+    const alphabet = alphabets.value.find(a => a.id === selectedAlphabetId.value)
+    if (!alphabet)
+      return null
+    return alphabet.labels.find(l => l.id === selectedLabelId.value) || null
+  })
 
   // --- Loading Actions ---
   async function loadManifest() {
@@ -35,7 +47,8 @@ export const useLabelStore = defineStore('labels', () => {
       }
       const data: LabelManifest = await response.json()
       manifest.value = data.alphabets
-    } catch (error) {
+    }
+    catch (error) {
       console.error(error)
       manifest.value = []
     }
@@ -51,7 +64,8 @@ export const useLabelStore = defineStore('labels', () => {
         }
         const alphabet: LabelAlphabet = await response.json()
         alphabets.value.push(alphabet)
-      } catch (error) {
+      }
+      catch (error) {
         console.error(error)
       }
     }
@@ -67,7 +81,8 @@ export const useLabelStore = defineStore('labels', () => {
         body: JSON.stringify({ alphabets: manifest.value }),
       })
       console.log('Manifest saved')
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Error saving manifest:', error)
     }
   }
@@ -81,7 +96,8 @@ export const useLabelStore = defineStore('labels', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(alphabet),
       })
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Error saving alphabet:', error)
     }
   }
@@ -106,7 +122,7 @@ export const useLabelStore = defineStore('labels', () => {
     try {
       // Send DELETE request to API endpoint to remove the file.
       const response = await fetch(`/api/labels/${filename}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       })
       if (!response.ok) {
         throw new Error(`Failed to delete ${filename} on the server.`)
@@ -118,23 +134,28 @@ export const useLabelStore = defineStore('labels', () => {
       // Update the manifest on the server.
       await saveManifest()
       console.log(`Alphabet ${alphabetId} removed successfully.`)
-    } catch (error: any) {
+    }
+    catch (error: any) {
       console.error('Error removing alphabet:', error)
     }
   }
 
   async function addLabel(alphabetId: string, label: Label) {
     const alphabet = alphabets.value.find(a => a.id === alphabetId)
-    if (!alphabet) return
+    if (!alphabet)
+      return
     // Generate a new label id.
     label.id = uuidv4()
+    // Initialize images array if not present
+    label.images = label.images || []
     alphabet.labels.push(label)
     await saveAlphabet(alphabet)
   }
 
   async function removeLabel(alphabetId: string, labelId: string) {
     const alphabet = alphabets.value.find(a => a.id === alphabetId)
-    if (!alphabet) return
+    if (!alphabet)
+      return
     alphabet.labels = alphabet.labels.filter(l => l.id !== labelId)
     await saveAlphabet(alphabet)
   }
@@ -142,9 +163,11 @@ export const useLabelStore = defineStore('labels', () => {
   async function moveLabel(labelId: string, sourceAlphabetId: string, targetAlphabetId: string) {
     const source = alphabets.value.find(a => a.id === sourceAlphabetId)
     const target = alphabets.value.find(a => a.id === targetAlphabetId)
-    if (!source || !target) return
+    if (!source || !target)
+      return
     const label = source.labels.find(l => l.id === labelId)
-    if (!label) return
+    if (!label)
+      return
     source.labels = source.labels.filter(l => l.id !== labelId)
     target.labels.push(label)
     await saveAlphabet(source)
@@ -155,9 +178,89 @@ export const useLabelStore = defineStore('labels', () => {
     await addLabel(alphabetId, label)
   }
 
+  // --- Label Selection ---
+  function selectLabel(alphabetId: string, labelId: string) {
+    selectedAlphabetId.value = alphabetId
+    selectedLabelId.value = labelId
+  }
+
+  function clearLabelSelection() {
+    selectedAlphabetId.value = null
+    selectedLabelId.value = null
+  }
+
+  // --- Image Assignment ---
+  async function addImagesToLabel(alphabetId: string, labelId: string, imageIds: string[]) {
+    const alphabet = alphabets.value.find(a => a.id === alphabetId)
+    if (!alphabet)
+      return
+
+    const label = alphabet.labels.find(l => l.id === labelId)
+    if (!label)
+      return
+
+    // Initialize images array if not present
+    if (!label.images) {
+      label.images = []
+    }
+
+    // Add new image IDs (avoiding duplicates)
+    const uniqueImageIds = imageIds.filter(id => !label.images?.includes(id))
+    if (uniqueImageIds.length === 0)
+      return
+
+    label.images = [...label.images, ...uniqueImageIds]
+
+    // Save the updated alphabet
+    await saveAlphabet(alphabet)
+  }
+
+  async function addSelectedImagesToLabel() {
+    if (!selectedLabelId.value || !selectedAlphabetId.value)
+      return
+
+    const imageStore = useImageStore()
+    const selectedImageIds = Array.from(imageStore.selectedIds)
+
+    if (selectedImageIds.length === 0)
+      return
+
+    await addImagesToLabel(selectedAlphabetId.value, selectedLabelId.value, selectedImageIds)
+  }
+
+  async function removeImageFromLabel(alphabetId: string, labelId: string, imageId: string) {
+    const alphabet = alphabets.value.find(a => a.id === alphabetId)
+    if (!alphabet)
+      return
+
+    const label = alphabet.labels.find(l => l.id === labelId)
+    if (!label || !label.images)
+      return
+
+    label.images = label.images.filter(id => id !== imageId)
+
+    await saveAlphabet(alphabet)
+  }
+
+  // --- Get Images for a Label ---
+  function getLabelImages(alphabetId: string, labelId: string): string[] {
+    const alphabet = alphabets.value.find(a => a.id === alphabetId)
+    if (!alphabet)
+      return []
+
+    const label = alphabet.labels.find(l => l.id === labelId)
+    if (!label || !label.images)
+      return []
+
+    return label.images
+  }
+
   return {
     manifest,
     alphabets,
+    selectedLabelId,
+    selectedAlphabetId,
+    selectedLabel,
     loadManifest,
     loadAlphabets,
     saveManifest,
@@ -168,6 +271,12 @@ export const useLabelStore = defineStore('labels', () => {
     removeLabel,
     moveLabel,
     addLabelToAlphabet,
+    selectLabel,
+    clearLabelSelection,
+    addImagesToLabel,
+    addSelectedImagesToLabel,
+    removeImageFromLabel,
+    getLabelImages,
   }
 })
 
