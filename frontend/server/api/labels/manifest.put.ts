@@ -28,9 +28,10 @@ export default defineEventHandler(async (event) => {
     const manifestPath = path.join(labelsDir, 'label_manifest.json')
     fs.writeFileSync(manifestPath, JSON.stringify(body, null, 2), 'utf-8')
     console.log('Manifest saved successfully to', manifestPath)
-    
+
     return { status: 'ok' }
-  } catch (error: any) {
+  }
+  catch (error: any) {
     setResponseStatus(event, 500)
     console.error('Error saving manifest:', error)
     return { error: error.message }

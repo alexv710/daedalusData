@@ -10,18 +10,21 @@ const groupedCharts = computed(() => {
 
   // Loop over each selected image
   imageStore.selectedImages.forEach((img) => {
-    if (!img) return
+    if (!img)
+      return
     // For every property in the image, except name or id
     Object.keys(img).forEach((key) => {
-      if (key === 'name' || key === 'id') return
+      if (key === 'name' || key === 'id')
+        return
       const value = img[key] ?? 'unknown'
-      if (!groups[key]) groups[key] = {}
+      if (!groups[key])
+        groups[key] = {}
       groups[key][value] = (groups[key][value] || 0) + 1
     })
   })
 
   // Convert the counts for each attribute into an array suitable for the chart
-  const result: Record<string, Array<{ value: string; count: number }>> = {}
+  const result: Record<string, Array<{ value: string, count: number }>> = {}
   Object.keys(groups).forEach((attribute) => {
     result[attribute] = Object.entries(groups[attribute]).map(([val, count]) => ({
       value: val,
@@ -30,7 +33,6 @@ const groupedCharts = computed(() => {
   })
   return result
 })
-
 </script>
 
 <template>
@@ -98,11 +100,13 @@ const groupedCharts = computed(() => {
           :key="attribute"
           class="mb-6"
         >
-          <h3 class="text-lg font-bold mb-2">{{ attribute }}</h3>
-          <BoxPlotChart 
-            :data="data" 
-            xLabel="Value" 
-            yLabel="Count" 
+          <h3 class="mb-2 text-lg font-bold">
+            {{ attribute }}
+          </h3>
+          <BoxPlotChart
+            :data="data"
+            x-label="Value"
+            y-label="Count"
           />
         </div>
       </v-navigation-drawer>
