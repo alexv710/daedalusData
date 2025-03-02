@@ -235,7 +235,7 @@ onMounted(async () => {
 
 <template>
   <v-card outlined class="m-auto max-w-600px">
-    <v-card-title class="justify-space-between align-center text-h6">
+    <v-card-title class="text-h6 justify-space-between align-center">
       <span>Label Alphabet Manager</span>
     </v-card-title>
 

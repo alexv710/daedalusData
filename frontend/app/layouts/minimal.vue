@@ -8,7 +8,7 @@ const colorMode = useColorMode()
 
 // State for tracking visible charts
 const visibleBoxPlots = ref<string[]>([])
-const violinChartCount = ref(0)
+const violinCharts = ref<number[]>([])
 
 // Color palettes for the theme
 const colorPalettes = {
@@ -37,6 +37,11 @@ const colorPalettes = {
     '#c084fc', // purple-400
   ],
 }
+
+// For the toolbar
+const sceneRef = ref(null)
+const displayedImage = computed(() => imageStore.displayedImage)
+const isImageFocusLocked = computed(() => imageStore.isImageFocusLocked)
 
 // Get colors based on the current theme
 const chartColors = computed(() => {
@@ -77,14 +82,39 @@ function removeBoxPlotChart(attribute) {
 
 // Add a new violin chart
 function addViolinChart() {
-  violinChartCount.value++
+  // Add a new chart with a unique ID (using timestamp or simple incrementing counter)
+  const newId = violinCharts.value.length > 0
+    ? Math.max(...violinCharts.value) + 1
+    : 1
+  violinCharts.value.push(newId)
 }
 
 // Remove a violin chart
 function removeViolinChart(index) {
-  if (violinChartCount.value > 0) {
-    violinChartCount.value--
+  // Remove the chart with the specific ID
+  violinCharts.value = violinCharts.value.filter(id => id !== index)
+}
+
+// For toolbar functionality
+function resetFocus() {
+  if (sceneRef.value) {
+    sceneRef.value.resetFocus()
   }
+}
+
+// Helper function to get a display name for the current image
+function getDisplayName() {
+  const id = imageStore.displayedId
+  if (!id)
+    return 'None'
+
+  // If the image has a name property, use it
+  const img = imageStore.displayedImage
+  if (img && img.name)
+    return img.name
+
+  // Otherwise return the ID or a cleaned filename
+  return id.split('/').pop() || id
 }
 </script>
 
@@ -117,7 +147,7 @@ function removeViolinChart(index) {
         permanent
         location="left"
         width="400"
-        class="scrollable pa-0"
+        class="pa-0"
       >
         <v-list dense class="pa-0">
           <!-- Projection Selector -->
@@ -138,7 +168,40 @@ function removeViolinChart(index) {
 
       <!-- Main Content -->
       <v-main>
-        <slot />
+        <div class="relative h-full">
+          <slot />
+          <!-- Small toolbar at the bottom for status info -->
+          <div class="bottom-toolbar border-t border-gray-300 px-4 py-2 dark:border-gray-700 dark:bg-gray-800">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <span v-if="displayedImage" class="mr-4 text-sm">
+                  <strong>Current image:</strong> {{ getDisplayName() }}
+                </span>
+
+                <span v-if="isImageFocusLocked" class="rounded-full bg-blue-100 px-2 py-1 text-sm dark:bg-blue-900">
+                  Locked (press ESC to unlock)
+                </span>
+              </div>
+
+              <div class="flex gap-3">
+                <button
+                  class="rounded bg-gray-200 px-3 py-1 text-sm dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  @click="imageStore.toggleDetailWindow()"
+                >
+                  {{ imageStore.isDetailWindowOpen() ? 'Close' : 'Show' }} Detail Window
+                </button>
+
+                <button
+                  v-if="isImageFocusLocked"
+                  class="rounded bg-gray-200 px-3 py-1 text-sm dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  @click="resetFocus"
+                >
+                  Unlock (ESC)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </v-main>
 
       <!-- Right Navigation Drawer -->
@@ -147,7 +210,7 @@ function removeViolinChart(index) {
         permanent
         location="right"
         width="400"
-        class="pa-2"
+        class="pa-0"
       >
         <v-card flat>
           <v-tabs v-model="activeTab" grow>
@@ -217,7 +280,7 @@ function removeViolinChart(index) {
                 </div>
 
                 <!-- No charts message -->
-                <div v-if="violinChartCount === 0" class="py-8 text-center text-gray-500">
+                <div v-if="violinCharts.length === 0" class="py-8 text-center text-gray-500">
                   <v-icon color="grey" size="large">
                     mdi-chart-bell-curve
                   </v-icon>
@@ -227,11 +290,11 @@ function removeViolinChart(index) {
                 </div>
 
                 <!-- Violin charts -->
-                <template v-for="i in violinChartCount" :key="`violin-${i}`">
+                <template v-for="chartId in violinCharts" :key="`violin-${chartId}`">
                   <ChartWrapper
-                    :title="`Distribution Analysis ${i}`"
+                    :title="`Distribution Analysis ${chartId}`"
                     :show-remove-button="true"
-                    @remove="removeViolinChart(i)"
+                    @remove="removeViolinChart(chartId)"
                   >
                     <TwoAttributeViolinPlot
                       :data="imageStore.selectedImages"
@@ -252,8 +315,11 @@ function removeViolinChart(index) {
 </template>
 
 <style scoped>
-.scrollable {
-  overflow-y: auto;
-  max-height: calc(100vh - 120px);
+.bottom-toolbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
 }
 </style>

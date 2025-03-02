@@ -145,7 +145,8 @@ function kernelDensityEstimator(kernel, X) {
 
 function kernelEpanechnikov(k) {
   return function (v) {
-    return Math.abs(v /= k) <= 1 ? 0.75 * (1 - v * v) / k : 0
+    v /= k
+    return Math.abs(v) <= 1 ? 0.75 * (1 - v * v) / k : 0
   }
 }
 
@@ -157,7 +158,7 @@ function createBinnedData(data) {
   // Extract all numeric values for the X attribute
   const numericValues = data
     .map(d => d[selectedXAttribute.value])
-    .filter(v => typeof v === 'number' && !isNaN(v))
+    .filter(v => typeof v === 'number' && !Number.isNaN(v))
 
   if (numericValues.length === 0)
     return data
@@ -180,7 +181,7 @@ function createBinnedData(data) {
     const value = d[selectedXAttribute.value]
     const result = { ...d }
 
-    if (typeof value === 'number' && !isNaN(value)) {
+    if (typeof value === 'number' && !Number.isNaN(value)) {
       const binIndex = binScale(value)
       result[`${selectedXAttribute.value}__binned`] = binLabels[binIndex]
     }
@@ -206,7 +207,7 @@ function drawChart() {
     && item[selectedYAttribute.value] !== undefined
     && item[selectedYAttribute.value] !== null
     && typeof item[selectedYAttribute.value] === 'number'
-    && !isNaN(item[selectedYAttribute.value]),
+    && !Number.isNaN(item[selectedYAttribute.value]),
   )
 
   if (filteredData.length === 0) {
@@ -250,21 +251,21 @@ function drawChart() {
     .range([height.value, 0])
 
   // Draw grid lines for better readability
-  addGridLines(g, width.value, height.value, yScale)
+  addGridLines(g, width.value, yScale)
 
   // Draw violin plots
   if (localShowViolin.value) {
-    drawViolinPlots(g, groupedData, xScale, yScale, xAttr)
+    drawViolinPlots(g, groupedData, xScale, yScale)
   }
 
   // Draw box plots
   if (localShowBoxPlot.value) {
-    drawBoxPlots(g, groupedData, xScale, yScale, xAttr)
+    drawBoxPlots(g, groupedData, xScale, yScale)
   }
 
   // Draw data points
   if (localShowDataPoints.value) {
-    drawDataPoints(g, groupedData, xScale, yScale, xAttr)
+    drawDataPoints(g, groupedData, xScale, yScale)
   }
 
   // X axis with wrapped labels
@@ -274,7 +275,7 @@ function drawChart() {
     .call(d3.axisBottom(xScale))
 
   // Handle label wrapping for better display
-  handleXAxisLabels(xAxis, xScale)
+  handleXAxisLabels(xAxis)
 
   // Add Y axis
   g.append('g')
@@ -282,7 +283,7 @@ function drawChart() {
     .call(d3.axisLeft(yScale))
 }
 
-function handleXAxisLabels(xAxis, xScale) {
+function handleXAxisLabels(xAxis) {
   xAxis.selectAll('.tick text')
     .attr('transform', 'rotate(-35)')
     .style('text-anchor', 'end')
@@ -300,7 +301,7 @@ function handleXAxisLabels(xAxis, xScale) {
     })
 }
 
-function addGridLines(g, width, height, yScale) {
+function addGridLines(g, width, yScale) {
   g.append('g')
     .attr('class', 'grid-lines')
     .call(
@@ -313,7 +314,7 @@ function addGridLines(g, width, height, yScale) {
     .attr('stroke-dasharray', '2,2')
 }
 
-function drawViolinPlots(g, groupedData, xScale, yScale, xAttr) {
+function drawViolinPlots(g, groupedData, xScale, yScale) {
   groupedData.forEach((groupData, key) => {
     const values = groupData.map(d => d[selectedYAttribute.value])
     const violinWidth = xScale.bandwidth() * (props.violinWidth / 100)
@@ -348,7 +349,7 @@ function drawViolinPlots(g, groupedData, xScale, yScale, xAttr) {
   })
 }
 
-function drawBoxPlots(g, groupedData, xScale, yScale, xAttr) {
+function drawBoxPlots(g, groupedData, xScale, yScale) {
   groupedData.forEach((groupData, key) => {
     const values = groupData.map(d => d[selectedYAttribute.value]).sort(d3.ascending)
 
@@ -423,7 +424,7 @@ function drawBoxPlots(g, groupedData, xScale, yScale, xAttr) {
   })
 }
 
-function drawDataPoints(g, groupedData, xScale, yScale, xAttr) {
+function drawDataPoints(g, groupedData, xScale, yScale) {
   groupedData.forEach((groupData, key) => {
     if (groupData.length === 0)
       return
