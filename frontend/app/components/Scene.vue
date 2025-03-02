@@ -9,6 +9,8 @@ const props = defineProps({
   offsetX: { type: Number, default: 0 },
 })
 
+const emit = defineEmits(['imageFocusChange'])
+
 // ----- Pinia Store Integration -----
 const imageStore = useImageStore()
 
@@ -43,7 +45,7 @@ const isDragging = ref(false)
 const dragThreshold = 5
 const lastHovered = { index: -1, mesh: null }
 const leftClickStartPos = ref<THREE.Vector2 | null>(null)
-
+const hoveredInstanceId = ref(-1)
 // NEW: Lasso shape drawing state
 const lassoShapePoints = ref<THREE.Vector3[]>([])
 const lassoShapeMesh = shallowRef<THREE.Mesh | null>(null)
@@ -350,79 +352,55 @@ function updateHoveredMesh(
     console.timeEnd('Lasso Total Time')
   }
   else {
-    let closestIntersection = Infinity
-    let closestMesh: THREE.InstancedMesh | null = null
-    let closestInstanceId = -1
-    sceneRef.value?.traverse((obj) => {
-      if (obj instanceof THREE.InstancedMesh) {
-        const mesh = obj
-        const instanceCount = mesh.count
-        const matrix = new THREE.Matrix4()
-        const aspectRatios = mesh.geometry.attributes.instanceAspectRatio
-        for (let instanceId = 0; instanceId < instanceCount; instanceId++) {
-          mesh.getMatrixAt(instanceId, matrix)
-          matrix.decompose(instancePosition, new THREE.Quaternion(), instanceScale)
-          if (!frustum.containsPoint(instancePosition))
-            continue
-          const aspectRatio = aspectRatios.getX(instanceId)
-          const width = Math.max(1, aspectRatio) * instanceScale.x
-          const height = Math.max(1, 1 / aspectRatio) * instanceScale.y
-          boundingBox.setFromCenterAndSize(instancePosition, new THREE.Vector3(width, height, 0.01))
-          if (raycaster.ray.intersectsBox(boundingBox)) {
-            const plane = new THREE.Plane()
-            plane.setFromNormalAndCoplanarPoint(
-              new THREE.Vector3(0, 0, 1).applyQuaternion(new THREE.Quaternion().setFromRotationMatrix(matrix)),
-              instancePosition,
-            )
-            const intersection = new THREE.Vector3()
-            const intersected = raycaster.ray.intersectPlane(plane, intersection)
-            if (intersected) {
-              const distance = intersection.distanceTo(cameraRef.value!.position)
-              if (distance < closestIntersection) {
-                localIntersection.copy(intersection).applyMatrix4(matrix.invert())
-                if (Math.abs(localIntersection.x) <= width / 2 && Math.abs(localIntersection.y) <= height / 2) {
-                  closestIntersection = distance
-                  closestMesh = mesh
-                  closestInstanceId = instanceId
-                }
-              }
-            }
-          }
-        }
-      }
-    })
-    cameraRef.value!.updateMatrixWorld(true)
-    projScreenMatrix.multiplyMatrices(cameraRef.value!.projectionMatrix, cameraRef.value!.matrixWorldInverse)
-    frustum.setFromProjectionMatrix(projScreenMatrix)
-    raycaster.setFromCamera(mouseVec, cameraRef.value!)
-    if (lastHovered.index !== -1 && lastHovered.mesh) {
+    const hitResult = findHoveredInstance()
+
+    // Clear previous hover highlight if it's not the locked image
+    if (lastHovered.index !== -1 && lastHovered.mesh
+      && (!imageStore.isImageFocusLocked
+        || instanceToKeyMap.value.get(lastHovered.index) !== imageStore.focusedId)) {
       const key = instanceToKeyMap.value.get(lastHovered.index)
       if (!key || !imageStore.selectedIds.has(key)) {
         setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
       }
       lastHovered.index = -1
       lastHovered.mesh = null
+
+      // If not locked, clear the hovered image
+      if (!imageStore.isImageFocusLocked) {
+        hoveredInstanceId.value = -1
+        imageStore.setHoveredImage(null)
+        emit('imageFocusChange', null)
+      }
     }
-    if (closestMesh && closestInstanceId !== -1) {
+
+    if (hitResult && hitResult.mesh) {
+      const { mesh, instanceId } = hitResult
+
       switch (interactionType) {
         case 'hover': {
-          const key = instanceToKeyMap.value.get(closestInstanceId)
+          // Update hover state
+          const key = instanceToKeyMap.value.get(instanceId)
+
           if (!key || !imageStore.selectedIds.has(key)) {
-            setInstanceHighlight(closestMesh, closestInstanceId, 1)
+            setInstanceHighlight(mesh, instanceId, 1)
           }
-          lastHovered.index = closestInstanceId
-          lastHovered.mesh = closestMesh
+
+          lastHovered.index = instanceId
+          lastHovered.mesh = mesh
+          hoveredInstanceId.value = instanceId
+
+          // Update the hovered image in the store
+          if (key) {
+            imageStore.setHoveredImage(key)
+          }
+
+          // Emit the hovered image key for display if not locked
+          if (!imageStore.isImageFocusLocked && key) {
+            emit('imageFocusChange', key)
+          }
           break
         }
         case 'left-click': {
-          if (isControlPressed) {
-            const key = instanceToKeyMap.value.get(closestInstanceId)
-            if (key) {
-              imageStore.toggleSelection(key)
-              setInstanceHighlight(closestMesh, closestInstanceId, imageStore.selectedIds.has(key) ? 1 : 0)
-              console.log('Left-click toggled selection for:', key)
-            }
-          }
           break
         }
         case 'right-click':
@@ -430,6 +408,29 @@ function updateHoveredMesh(
           break
       }
     }
+  }
+}
+
+function resetFocus() {
+  // Clear focus in the store
+  imageStore.unlockImageFocus()
+
+  // Clear highlight on the previously focused instance
+  if (lastHovered.index !== -1 && lastHovered.mesh) {
+    const key = instanceToKeyMap.value.get(lastHovered.index)
+    if (!key || !imageStore.selectedIds.has(key)) {
+      setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
+    }
+    lastHovered.index = -1
+    lastHovered.mesh = null
+  }
+
+  emit('imageFocusChange', null)
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && imageStore.isImageFocusLocked) {
+    resetFocus()
   }
 }
 
@@ -512,11 +513,128 @@ function handleMouseUp(event: MouseEvent) {
       lassoShapeMesh.value.visible = false
     }
   }
+
   if (event.button === 0 && !isDragging.value) {
-    updateHoveredMesh('left-click', event.ctrlKey, undefined)
+    // Handle click interaction
+    const hitResult = findHoveredInstance()
+
+    if (hitResult) {
+      const key = instanceToKeyMap.value.get(hitResult.instanceId)
+      if (key) {
+        // If ctrl is pressed, handle selection toggling
+        if (event.ctrlKey) {
+          imageStore.toggleSelection(key)
+          if (hitResult.mesh) {
+            setInstanceHighlight(
+              hitResult.mesh,
+              hitResult.instanceId,
+              imageStore.selectedIds.has(key) ? 1 : 0,
+            )
+          }
+        }
+        else {
+          // Lock focus on clicked image
+          imageStore.lockImageFocus(key)
+
+          if (hitResult.mesh) {
+            setInstanceHighlight(hitResult.mesh, hitResult.instanceId, 1)
+          }
+
+          // Emit the focused image key for display
+          emit('imageFocusChange', key)
+
+          // Open detail window if not already open
+          if (!imageStore.isDetailWindowOpen()) {
+            imageStore.openDetailWindow(key)
+          }
+        }
+      }
+    }
+    else {
+      // Clicked on empty space, unlock focus
+      resetFocus()
+    }
   }
+
   leftClickStartPos.value = null
   isDragging.value = false
+}
+
+function findHoveredInstance() {
+  if (!cameraRef.value || !sceneRef.value)
+    return null
+
+  let closestIntersection = Infinity
+  let closestMesh: THREE.InstancedMesh | null = null
+  let closestInstanceId = -1
+
+  cameraRef.value.updateMatrixWorld(true)
+  projScreenMatrix.multiplyMatrices(
+    cameraRef.value.projectionMatrix,
+    cameraRef.value.matrixWorldInverse,
+  )
+  frustum.setFromProjectionMatrix(projScreenMatrix)
+  raycaster.setFromCamera(mouseVec, cameraRef.value)
+
+  sceneRef.value.traverse((obj) => {
+    if (obj instanceof THREE.InstancedMesh) {
+      const mesh = obj
+      const instanceCount = mesh.count
+      const matrix = new THREE.Matrix4()
+      const aspectRatios = mesh.geometry.attributes.instanceAspectRatio
+
+      for (let instanceId = 0; instanceId < instanceCount; instanceId++) {
+        mesh.getMatrixAt(instanceId, matrix)
+        matrix.decompose(instancePosition, new THREE.Quaternion(), instanceScale)
+
+        if (!frustum.containsPoint(instancePosition))
+          continue
+
+        const aspectRatio = aspectRatios.getX(instanceId)
+        const width = Math.max(1, aspectRatio) * instanceScale.x
+        const height = Math.max(1, 1 / aspectRatio) * instanceScale.y
+
+        boundingBox.setFromCenterAndSize(
+          instancePosition,
+          new THREE.Vector3(width, height, 0.01),
+        )
+
+        if (raycaster.ray.intersectsBox(boundingBox)) {
+          const plane = new THREE.Plane()
+          plane.setFromNormalAndCoplanarPoint(
+            new THREE.Vector3(0, 0, 1).applyQuaternion(
+              new THREE.Quaternion().setFromRotationMatrix(matrix),
+            ),
+            instancePosition,
+          )
+
+          const intersection = new THREE.Vector3()
+          const intersected = raycaster.ray.intersectPlane(plane, intersection)
+
+          if (intersected) {
+            const distance = intersection.distanceTo(cameraRef.value.position)
+
+            if (distance < closestIntersection) {
+              localIntersection.copy(intersection).applyMatrix4(matrix.invert())
+
+              if (
+                Math.abs(localIntersection.x) <= width / 2
+                && Math.abs(localIntersection.y) <= height / 2
+              ) {
+                closestIntersection = distance
+                closestMesh = mesh
+                closestInstanceId = instanceId
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+
+  return closestInstanceId !== -1
+    ? { mesh: closestMesh, instanceId: closestInstanceId }
+    : null
 }
 
 // ----- Main onMounted Block -----
@@ -612,6 +730,7 @@ onMounted(async () => {
     console.error('Error fetching atlas data:', err)
   }
   window.addEventListener('resize', handleResize)
+  window.addEventListener('keydown', handleKeyDown)
   canvas.value?.addEventListener('mousedown', handleMouseDown)
   canvas.value?.addEventListener('mousemove', handleMouseMove)
   canvas.value?.addEventListener('mouseup', handleMouseUp)
@@ -655,15 +774,18 @@ watch(backgroundColor, (color) => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('keydown', handleKeyDown)
   canvas.value?.removeEventListener('mousedown', handleMouseDown)
   canvas.value?.removeEventListener('mousemove', handleMouseMove)
   canvas.value?.removeEventListener('mouseup', handleMouseUp)
+  canvas.value?.removeEventListener('contextmenu', e => e.preventDefault())
 })
 
 defineExpose({
   handleResize,
   updateMouse,
   updateHoveredMesh,
+  resetFocus,
 })
 </script>
 

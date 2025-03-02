@@ -21,7 +21,8 @@ function handleButtonClick() {
   if (props.chartType === 'violin') {
     // For violin plots, directly add without showing the dialog
     emit('add-chart')
-  } else {
+  }
+  else {
     // For boxplots, open the dialog to select an attribute
     dialog.value = true
   }
@@ -32,7 +33,7 @@ function addChart() {
     emit('add-chart', selectedAttribute.value)
     selectedAttribute.value = null
   }
-  
+
   dialog.value = false
 }
 </script>

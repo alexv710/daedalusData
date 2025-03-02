@@ -9,6 +9,12 @@ export const useImageStore = defineStore('image', () => {
 
   const selectedIds = ref(new Set())
   const highlightedIds = ref(new Set())
+  const hoveredId = ref(null)
+  const focusedId = ref(null)
+  const isImageFocusLocked = ref(false)
+
+  // For popup window management
+  const imageDetailWindow = ref(null)
 
   // Load metadata from the JSON file and populate the store.
   async function loadImageMetadata() {
@@ -35,6 +41,38 @@ export const useImageStore = defineStore('image', () => {
   const highlightedImages = computed(() =>
     Array.from(highlightedIds.value).map(id => images.value.get(id)),
   )
+
+  // Get the focused image metadata
+  const focusedImage = computed(() => {
+    return focusedId.value ? images.value.get(focusedId.value) : null
+  })
+
+  // Get the hovered image metadata
+  const hoveredImage = computed(() => {
+    return hoveredId.value ? images.value.get(hoveredId.value) : null
+  })
+
+  // Get currently displayed image (focused if locked, otherwise hovered)
+  const displayedImage = computed(() => {
+    if (isImageFocusLocked.value && focusedId.value) {
+      return images.value.get(focusedId.value)
+    }
+    else if (hoveredId.value) {
+      return images.value.get(hoveredId.value)
+    }
+    return null
+  })
+
+  // Get the ID of the displayed image
+  const displayedId = computed(() => {
+    if (isImageFocusLocked.value && focusedId.value) {
+      return focusedId.value
+    }
+    else if (hoveredId.value) {
+      return hoveredId.value
+    }
+    return null
+  })
 
   // Get all available attributes from images
   const availableAttributes = computed(() => {
@@ -76,7 +114,7 @@ export const useImageStore = defineStore('image', () => {
       let hasNumeric = false
 
       for (const img of images.value.values()) {
-        if (img && typeof img[attr] === 'number' && !isNaN(img[attr])) {
+        if (img && typeof img[attr] === 'number' && !Number.isNaN(img[attr])) {
           hasNumeric = true
           break
         }
@@ -167,6 +205,92 @@ export const useImageStore = defineStore('image', () => {
     }
   }
 
+  // Actions for focus/hover state
+  function setHoveredImage(key) {
+    hoveredId.value = key
+
+    // If we have a detail window open and it's not locked, update it
+    if (imageDetailWindow.value && !isImageFocusLocked.value) {
+      updateDetailWindow(key)
+    }
+  }
+
+  function setFocusedImage(key) {
+    focusedId.value = key
+  }
+
+  function lockImageFocus(key) {
+    focusedId.value = key
+    isImageFocusLocked.value = true
+
+    // If we have a detail window open, update it
+    if (imageDetailWindow.value) {
+      updateDetailWindow(key)
+    }
+  }
+
+  function unlockImageFocus() {
+    isImageFocusLocked.value = false
+
+    // If not locked, show the currently hovered image in the detail window
+    if (imageDetailWindow.value && hoveredId.value) {
+      updateDetailWindow(hoveredId.value)
+    }
+
+    focusedId.value = null
+  }
+
+  // Detail window management
+  function openDetailWindow(imageId) {
+    // Close any existing window
+    closeDetailWindow()
+
+    // Build the URL for the detail page with the image ID as a parameter
+    const detailUrl = `/image-detail?id=${encodeURIComponent(imageId)}`
+
+    // Open the window - customize size and features as needed
+    imageDetailWindow.value = window.open(
+      detailUrl,
+      'imageDetail',
+      'width=800,height=800,resizable=yes,scrollbars=yes',
+    )
+
+    // For debugging
+    console.log(`Opened detail window for image: ${imageId}`)
+  }
+
+  function closeDetailWindow() {
+    if (imageDetailWindow.value && !imageDetailWindow.value.closed) {
+      imageDetailWindow.value.close()
+    }
+    imageDetailWindow.value = null
+  }
+
+  function updateDetailWindow(imageId) {
+    if (imageDetailWindow.value && !imageDetailWindow.value.closed) {
+      // Navigate to a new URL with the updated image ID
+      imageDetailWindow.value.location.href = `/image-detail?id=${encodeURIComponent(imageId)}`
+    }
+  }
+
+  function toggleDetailWindow() {
+    const id = displayedId.value
+    if (!id)
+      return
+
+    if (imageDetailWindow.value && !imageDetailWindow.value.closed) {
+      closeDetailWindow()
+    }
+    else {
+      openDetailWindow(id)
+    }
+  }
+
+  // Check if the window is open
+  function isDetailWindowOpen() {
+    return imageDetailWindow.value !== null && !imageDetailWindow.value.closed
+  }
+
   // --- Projection management ---
   // Holds the currently selected projection file name.
   const currentProjection = ref(null)
@@ -202,11 +326,18 @@ export const useImageStore = defineStore('image', () => {
     images,
     selectedIds,
     highlightedIds,
+    hoveredId,
+    focusedId,
+    isImageFocusLocked,
     loadImageMetadata,
     imageKeys,
     totalImages,
     selectedImages,
     highlightedImages,
+    focusedImage,
+    hoveredImage,
+    displayedImage,
+    displayedId,
     clearSelection,
     addSelection,
     removeSelection,
@@ -217,6 +348,10 @@ export const useImageStore = defineStore('image', () => {
     addHighlight,
     removeHighlight,
     toggleHighlight,
+    setHoveredImage,
+    setFocusedImage,
+    lockImageFocus,
+    unlockImageFocus,
     currentProjection,
     availableProjections,
     loadProjections,
@@ -225,6 +360,11 @@ export const useImageStore = defineStore('image', () => {
     attributeItems,
     availableNumericAttributes,
     attributeChartData,
+    openDetailWindow,
+    closeDetailWindow,
+    updateDetailWindow,
+    toggleDetailWindow,
+    isDetailWindowOpen,
   }
 })
 
