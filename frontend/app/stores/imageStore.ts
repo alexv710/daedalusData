@@ -114,7 +114,7 @@ export const useImageStore = defineStore('image', () => {
       let hasNumeric = false
 
       for (const img of images.value.values()) {
-        if (img && typeof img[attr] === 'number' && !isNaN(img[attr])) {
+        if (img && typeof img[attr] === 'number' && !Number.isNaN(img[attr])) {
           hasNumeric = true
           break
         }
