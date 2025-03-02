@@ -38,6 +38,11 @@ const colorPalettes = {
   ],
 }
 
+// For the toolbar
+const sceneRef = ref(null)
+const displayedImage = computed(() => imageStore.displayedImage)
+const isImageFocusLocked = computed(() => imageStore.isImageFocusLocked)
+
 // Get colors based on the current theme
 const chartColors = computed(() => {
   return colorMode.value === 'dark' ? colorPalettes.dark : colorPalettes.light
@@ -86,6 +91,28 @@ function removeViolinChart(index) {
     violinChartCount.value--
   }
 }
+
+// For toolbar functionality
+function resetFocus() {
+  if (sceneRef.value) {
+    sceneRef.value.resetFocus()
+  }
+}
+
+// Helper function to get a display name for the current image
+function getDisplayName() {
+  const id = imageStore.displayedId
+  if (!id)
+    return 'None'
+
+  // If the image has a name property, use it
+  const img = imageStore.displayedImage
+  if (img && img.name)
+    return img.name
+
+  // Otherwise return the ID or a cleaned filename
+  return id.split('/').pop() || id
+}
 </script>
 
 <template>
@@ -117,7 +144,7 @@ function removeViolinChart(index) {
         permanent
         location="left"
         width="400"
-        class="scrollable pa-0"
+        class="pa-0"
       >
         <v-list dense class="pa-0">
           <!-- Projection Selector -->
@@ -138,7 +165,40 @@ function removeViolinChart(index) {
 
       <!-- Main Content -->
       <v-main>
-        <slot />
+        <div class="relative h-full">
+          <slot />
+          <!-- Small toolbar at the bottom for status info -->
+          <div class="bottom-toolbar border-t border-gray-300 px-4 py-2 dark:border-gray-700 dark:bg-gray-800">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <span v-if="displayedImage" class="mr-4 text-sm">
+                  <strong>Current image:</strong> {{ getDisplayName() }}
+                </span>
+
+                <span v-if="isImageFocusLocked" class="rounded-full bg-blue-100 px-2 py-1 text-sm dark:bg-blue-900">
+                  Locked (press ESC to unlock)
+                </span>
+              </div>
+
+              <div class="flex gap-3">
+                <button
+                  class="rounded bg-gray-200 px-3 py-1 text-sm dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  @click="imageStore.toggleDetailWindow()"
+                >
+                  {{ imageStore.isDetailWindowOpen() ? 'Close' : 'Show' }} Detail Window
+                </button>
+
+                <button
+                  v-if="isImageFocusLocked"
+                  class="rounded bg-gray-200 px-3 py-1 text-sm dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  @click="resetFocus"
+                >
+                  Unlock (ESC)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </v-main>
 
       <!-- Right Navigation Drawer -->
@@ -147,7 +207,7 @@ function removeViolinChart(index) {
         permanent
         location="right"
         width="400"
-        class="pa-2"
+        class="pa-0"
       >
         <v-card flat>
           <v-tabs v-model="activeTab" grow>
@@ -252,8 +312,11 @@ function removeViolinChart(index) {
 </template>
 
 <style scoped>
-.scrollable {
-  overflow-y: auto;
-  max-height: calc(100vh - 120px);
+.bottom-toolbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
 }
 </style>
