@@ -17,7 +17,8 @@ services:
       - DATABASE_URL=/data/db/app.db
       - JUPYTER_TOKEN=daedalus-dev
     command: >
-      sh -c "jupyter notebook 
+      sh -c "rm -f /tmp/nitro/worker*.sock && 
+      jupyter notebook 
       --ip=0.0.0.0 
       --allow-root 
       --no-browser 
