@@ -9,7 +9,7 @@ const props = defineProps({
   offsetX: { type: Number, default: 0 },
 })
 
-const emit = defineEmits(['image-focus-change'])
+const emit = defineEmits(['imageFocusChange'])
 
 // ----- Pinia Store Integration -----
 const imageStore = useImageStore()
@@ -369,7 +369,7 @@ function updateHoveredMesh(
       if (!imageStore.isImageFocusLocked) {
         hoveredInstanceId.value = -1
         imageStore.setHoveredImage(null)
-        emit('image-focus-change', null)
+        emit('imageFocusChange', null)
       }
     }
 
@@ -396,7 +396,7 @@ function updateHoveredMesh(
 
           // Emit the hovered image key for display if not locked
           if (!imageStore.isImageFocusLocked && key) {
-            emit('image-focus-change', key)
+            emit('imageFocusChange', key)
           }
           break
         }
@@ -425,7 +425,7 @@ function resetFocus() {
     lastHovered.mesh = null
   }
 
-  emit('image-focus-change', null)
+  emit('imageFocusChange', null)
 }
 
 function handleKeyDown(event: KeyboardEvent) {
@@ -503,20 +503,6 @@ function handleMouseMove(event: MouseEvent) {
   }
 }
 
-function handleDoubleClick(event: MouseEvent) {
-  if (event.button === 0) {
-    const hitResult = findHoveredInstance()
-
-    if (hitResult) {
-      const key = instanceToKeyMap.value.get(hitResult.instanceId)
-      if (key) {
-        // Toggle detail window
-        imageStore.toggleDetailWindow()
-      }
-    }
-  }
-}
-
 function handleMouseUp(event: MouseEvent) {
   if (lassoDrawing.value && event.button === 2) {
     updateHoveredMesh('lasso', event.ctrlKey, lassoDepthPoints.value)
@@ -555,7 +541,7 @@ function handleMouseUp(event: MouseEvent) {
           }
 
           // Emit the focused image key for display
-          emit('image-focus-change', key)
+          emit('imageFocusChange', key)
 
           // Open detail window if not already open
           if (!imageStore.isDetailWindowOpen()) {
@@ -748,7 +734,6 @@ onMounted(async () => {
   canvas.value?.addEventListener('mousedown', handleMouseDown)
   canvas.value?.addEventListener('mousemove', handleMouseMove)
   canvas.value?.addEventListener('mouseup', handleMouseUp)
-  canvas.value?.addEventListener('dblclick', handleDoubleClick)
   canvas.value?.addEventListener('contextmenu', e => e.preventDefault())
 
   // Define the animate function so it's available outside.
@@ -793,7 +778,6 @@ onUnmounted(() => {
   canvas.value?.removeEventListener('mousedown', handleMouseDown)
   canvas.value?.removeEventListener('mousemove', handleMouseMove)
   canvas.value?.removeEventListener('mouseup', handleMouseUp)
-  canvas.value?.removeEventListener('dblclick', handleDoubleClick)
   canvas.value?.removeEventListener('contextmenu', e => e.preventDefault())
 })
 
