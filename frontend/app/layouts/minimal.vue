@@ -8,7 +8,7 @@ const colorMode = useColorMode()
 
 // State for tracking visible charts
 const visibleBoxPlots = ref<string[]>([])
-const violinChartCount = ref(0)
+const violinCharts = ref<number[]>([])
 
 // Color palettes for the theme
 const colorPalettes = {
@@ -82,14 +82,17 @@ function removeBoxPlotChart(attribute) {
 
 // Add a new violin chart
 function addViolinChart() {
-  violinChartCount.value++
+  // Add a new chart with a unique ID (using timestamp or simple incrementing counter)
+  const newId = violinCharts.value.length > 0
+    ? Math.max(...violinCharts.value) + 1
+    : 1
+  violinCharts.value.push(newId)
 }
 
 // Remove a violin chart
 function removeViolinChart(index) {
-  if (violinChartCount.value > 0) {
-    violinChartCount.value--
-  }
+  // Remove the chart with the specific ID
+  violinCharts.value = violinCharts.value.filter(id => id !== index)
 }
 
 // For toolbar functionality
@@ -277,7 +280,7 @@ function getDisplayName() {
                 </div>
 
                 <!-- No charts message -->
-                <div v-if="violinChartCount === 0" class="py-8 text-center text-gray-500">
+                <div v-if="violinCharts.length === 0" class="py-8 text-center text-gray-500">
                   <v-icon color="grey" size="large">
                     mdi-chart-bell-curve
                   </v-icon>
@@ -287,11 +290,11 @@ function getDisplayName() {
                 </div>
 
                 <!-- Violin charts -->
-                <template v-for="i in violinChartCount" :key="`violin-${i}`">
+                <template v-for="chartId in violinCharts" :key="`violin-${chartId}`">
                   <ChartWrapper
-                    :title="`Distribution Analysis ${i}`"
+                    :title="`Distribution Analysis ${chartId}`"
                     :show-remove-button="true"
-                    @remove="removeViolinChart(i)"
+                    @remove="removeViolinChart(chartId)"
                   >
                     <TwoAttributeViolinPlot
                       :data="imageStore.selectedImages"
