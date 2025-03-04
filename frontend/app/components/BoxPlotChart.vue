@@ -273,7 +273,7 @@ function handleMouseOver(event: MouseEvent, d: AggregatedDataPoint) {
   positionTooltip(event)
 }
 
-function handleMouseOut(event: MouseEvent, d: AggregatedDataPoint) {
+function handleMouseOut(event: MouseEvent) {
   if (!tooltip.value)
     return
 
