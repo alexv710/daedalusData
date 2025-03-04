@@ -698,6 +698,8 @@ onMounted(async () => {
   imageToInstanceMap.value = reverseNewMap
   labelStore.instanceToImageMap = instanceToImageMap.value
   labelStore.imageToInstanceMap = imageToInstanceMap.value
+  imageStore.instanceToImageMap = instanceToImageMap.value
+  imageStore.imageToInstanceMap = imageToInstanceMap.value
   console.log('Instance to key map:', instanceToImageMap.value)
 
   if (props.width <= 0 || props.height <= 0) {
@@ -815,7 +817,30 @@ watch(
 watch(backgroundColor, (color) => {
   sceneRef.value!.background = color
 })
+// filter updates
+// filter updates
+watch(() => imageStore.filteredImageIds, (filteredIds) => {
+  const instanceCount = instancedMeshRef.value?.count
+  if (!instanceCount) {
+    console.warn('Instance count is 0, skipping filter update.')
+    return
+  }
 
+  const filteredSet = new Set(filteredIds)
+  const grayedOut = new Float32Array(instanceCount).fill(0.0)
+
+  for (let i = 0; i < instanceCount; i++) {
+    // Since filteredIds now contains instance IDs directly
+    // We can just check if the current instance index is in the filtered set
+    if (!filteredSet.has(i)) {
+      grayedOut[i] = 1.0
+    }
+  }
+
+  instancedMeshRef.value?.geometry.setAttribute('instanceGrayedOut', new THREE.InstancedBufferAttribute(grayedOut, 1))
+}, { deep: true })
+
+// label updates
 watch(
   [
     () => [...labelStore.highlightedLabelIds],
