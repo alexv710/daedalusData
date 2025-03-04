@@ -789,32 +789,6 @@ onMounted(async () => {
   animate()
 })
 
-function parseColorToRGB(color) {
-  // Handle hex format (#RRGGBB)
-  if (color.startsWith('#')) {
-    const r = Number.parseInt(color.slice(1, 3), 16) / 255
-    const g = Number.parseInt(color.slice(3, 5), 16) / 255
-    const b = Number.parseInt(color.slice(5, 7), 16) / 255
-    return [r, g, b]
-  }
-
-  // Handle rgb format (rgb(r,g,b))
-  if (color.startsWith('rgb')) {
-    const matches = color.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/)
-    if (matches) {
-      return [
-        Number.parseInt(matches[1], 10) / 255,
-        Number.parseInt(matches[2], 10) / 255,
-        Number.parseInt(matches[3], 10) / 255,
-      ]
-    }
-  }
-
-  // Default to white if parsing fails
-  console.warn(`Failed to parse color: ${color}`)
-  return [0, 0, 0]
-}
-
 // Watch for changes in the current projection and update instance positions accordingly.
 watch(
   () => imageStore.currentProjection,
@@ -853,7 +827,6 @@ watch(
     const highlightedLabels = labelStore.highlightedLabels
 
     Object.values(highlightedLabels).forEach(({ color, instanceIds }) => {
-
       const splitHexColor = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color)
 
       if (!splitHexColor) {
