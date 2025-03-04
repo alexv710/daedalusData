@@ -68,7 +68,7 @@ function formatValue(value) {
   }
 
   // Handle dates
-  if (value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value)))) {
+  if (value instanceof Date || (typeof value === 'string' && !Number.isNaN(Date.parse(value)))) {
     return new Date(value).toLocaleString()
   }
 

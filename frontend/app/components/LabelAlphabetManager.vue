@@ -253,19 +253,6 @@ onMounted(async () => {
           </v-btn>
         </v-row>
 
-        <!-- Feedback message -->
-        <v-row class="mt-5 justify-center">
-          <v-fade-transition>
-            <v-chip
-              v-if="showFeedback"
-              color="info"
-              class="mr-2"
-            >
-              {{ feedback }}
-            </v-chip>
-          </v-fade-transition>
-        </v-row>
-
         <!-- Alphabet containers -->
         <div
           v-for="alphabet in labelStore.alphabets"
@@ -325,7 +312,9 @@ onMounted(async () => {
               :class="{ 'font-bold shadow-primary': isLabelSelected(label, alphabet.id) }"
               close
               :draggable="true"
-              @click="selectLabel(label, alphabet.id, $event)"
+              @click.left="selectLabel(label, alphabet.id, $event)"
+              @click.right.prevent="menu = false"
+              @click.right="labelStore.highlightLabel(label.id)"
               @click:close="labelStore.removeLabel(alphabet.id, label.id)"
               @dblclick="openEditLabel(label, alphabet.id)"
               @dragstart="onDragStart($event, label, alphabet.id)"
@@ -372,6 +361,19 @@ onMounted(async () => {
         <v-btn class="mb-2 ml-2" color="primary" size="small" @click="openAddAlphabet">
           Add Alphabet
         </v-btn>
+      </v-row>
+
+      <!-- Feedback message -->
+      <v-row class="mt-5 justify-center">
+        <v-fade-transition>
+          <v-chip
+            v-if="showFeedback"
+            color="info"
+            class="mr-2"
+          >
+            {{ feedback }}
+          </v-chip>
+        </v-fade-transition>
       </v-row>
     </v-card-text>
 

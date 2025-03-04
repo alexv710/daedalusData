@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid'
 export interface Label {
   id: string
   value: string
-  color?: string
+  color: string
   description?: string
   images?: string[]
 }
@@ -26,9 +26,34 @@ export const useLabelStore = defineStore('labels', () => {
   const manifest = ref([] as string[])
   const alphabets = ref([] as LabelAlphabet[])
   const selectedLabelId = ref<string | null>(null)
+  const highlightedLabelIds = ref(new Set<string>())
   const selectedAlphabetId = ref<string | null>(null)
+  const instanceToImageMap = ref(new Map<number, string>())
+  const imageToInstanceMap = ref(new Map<string, number>())
 
   // --- Computed ---
+  const highlightedLabels = computed(() => {
+    const result: Record<string, { color: string, instanceIds: number[] }> = {}
+
+    for (const labelId of highlightedLabelIds.value) {
+      const label = alphabets.value.flatMap(a => a.labels).find(l => l.id === labelId)
+      if (label) {
+        const imageIds = label.images || []
+        const instanceIds: number[] = []
+
+        for (const imageId of imageIds) {
+          const instanceId = imageToInstanceMap.value.get(imageId)
+          if (instanceId !== undefined) {
+            instanceIds.push(instanceId)
+          }
+        }
+        result[labelId] = { color: label.color, instanceIds }
+      }
+    }
+
+    return result
+  })
+
   const selectedLabel = computed(() => {
     if (!selectedLabelId.value || !selectedAlphabetId.value)
       return null
@@ -178,6 +203,20 @@ export const useLabelStore = defineStore('labels', () => {
     await addLabel(alphabetId, label)
   }
 
+  // --- Label Highlighting ---
+  function highlightLabel(labelId: string) {
+    if (highlightedLabelIds.value.has(labelId)) {
+      highlightedLabelIds.value.delete(labelId)
+    }
+    else {
+      highlightedLabelIds.value.add(labelId)
+    }
+  }
+
+  function clearLabelHighlight() {
+    highlightedLabelIds.value.clear()
+  }
+
   // --- Label Selection ---
   function selectLabel(alphabetId: string, labelId: string) {
     selectedAlphabetId.value = alphabetId
@@ -261,6 +300,7 @@ export const useLabelStore = defineStore('labels', () => {
     selectedLabelId,
     selectedAlphabetId,
     selectedLabel,
+    highlightedLabelIds,
     loadManifest,
     loadAlphabets,
     saveManifest,
@@ -273,10 +313,15 @@ export const useLabelStore = defineStore('labels', () => {
     addLabelToAlphabet,
     selectLabel,
     clearLabelSelection,
+    highlightLabel,
+    clearLabelHighlight,
     addImagesToLabel,
     addSelectedImagesToLabel,
     removeImageFromLabel,
     getLabelImages,
+    highlightedLabels,
+    instanceToImageMap,
+    imageToInstanceMap,
   }
 })
 
