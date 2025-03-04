@@ -13,6 +13,7 @@ const emit = defineEmits(['imageFocusChange'])
 
 // ----- Pinia Store Integration -----
 const imageStore = useImageStore()
+const labelStore = useLabelStore()
 
 // vuetify theme for color mode
 const colorMode = useColorMode()
@@ -20,13 +21,15 @@ const backgroundColor = computed(() => colorMode.value === 'light' ? new THREE.C
 )
 
 // Build mapping from instance index to image key.
-const instanceToKeyMap = ref(new Map<number, string>())
+const instanceToImageMap = ref(new Map<number, string>())
+const imageToInstanceMap = ref(new Map<string, number>())
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const cameraRef = ref<THREE.PerspectiveCamera | null>(null)
 const rendererRef = ref<THREE.WebGLRenderer | null>(null)
 const sceneRef = shallowRef<THREE.Scene | null>(null)
 const instancedMeshRef = shallowRef<THREE.InstancedMesh | null>(null)
+const count = ref(0)
 
 // ----- Raycasting & Lasso Handling -----
 const raycaster = new THREE.Raycaster()
@@ -72,12 +75,20 @@ attribute vec4 instanceUV;
 attribute float instanceHighlight;
 attribute float instanceAspectRatio;
 attribute vec3 instancePosition;
+attribute vec4 instanceBorderColor;
+attribute float instanceGrayedOut;
 varying vec2 vUV;
 varying float vHighlight;
 varying vec2 vDimensions;
+varying float vInstanceGrayedOut;
+varying vec4 vInstanceUV;
+varying vec4 vInstanceBorderColor;
 void main() {
     vUV = instanceUV.xy + instanceUV.zw * uv;
     vHighlight = instanceHighlight;
+    vInstanceGrayedOut = instanceGrayedOut;
+    vInstanceUV = instanceUV;
+    vInstanceBorderColor = instanceBorderColor;
     float width = max(1.0, instanceAspectRatio);
     float height = max(1.0, 1.0 / instanceAspectRatio);
     vDimensions = vec2(width, height);
@@ -92,12 +103,36 @@ uniform vec3 highlightColor;
 uniform float highlightIntensity;
 varying vec2 vUV;
 varying float vHighlight;
+varying float vInstanceGrayedOut;
 varying vec2 vDimensions;
+varying vec4 vInstanceUV;
+varying vec4 vInstanceBorderColor;
+
 void main() {
+    float borderThickness = 0.02;
+    
+    // Calculate instance-specific normalized UV coordinates
+    // This converts the global vUV back to a 0-1 range for each instance
+    vec2 instanceLocalUV = (vUV - vInstanceUV.xy) / vInstanceUV.zw;
+    
+    bool isBorder = 
+        instanceLocalUV.x < borderThickness || 
+        instanceLocalUV.x > (1.0 - borderThickness) || 
+        instanceLocalUV.y < borderThickness || 
+        instanceLocalUV.y > (1.0 - borderThickness);
+    
     vec4 texColor = texture2D(map, vUV);
     float adjustedHighlight = vHighlight * highlightIntensity;
-    vec3 finalColor = mix(texColor.rgb, highlightColor, adjustedHighlight);
-    gl_FragColor = vec4(finalColor, texColor.a);
+    vec4 highlightedColor = mix(texColor, vec4(highlightColor, texColor.a), adjustedHighlight);
+    vec4 grayedOutColor = vec4(0.5, 0.5, 0.5, 0.2);
+    
+    if (vInstanceGrayedOut > 0.5) {
+        gl_FragColor = grayedOutColor;
+    } else if (isBorder) {
+        gl_FragColor = vInstanceBorderColor;
+    } else {
+        gl_FragColor = highlightedColor;
+    }
 }
 `
 
@@ -118,12 +153,14 @@ function createInstancedMesh(
     ...info,
   }))
 
-  const count = atlasInfoArray.length
+  count.value = atlasInfoArray.length
   const geometry = new THREE.PlaneGeometry(1, 1)
-  const instanceUVs = new Float32Array(count * 4)
-  const instanceHighlights = new Float32Array(count)
-  const instanceAspectRatios = new Float32Array(count)
-  const instancePositions = new Float32Array(count * 3)
+  const instanceUVs = new Float32Array(count.value * 4)
+  const instanceHighlights = new Float32Array(count.value)
+  const instanceAspectRatios = new Float32Array(count.value)
+  const instancePositions = new Float32Array(count.value * 3)
+  const instanceGrayedOut = new Float32Array(count.value).fill(0.0)
+  const borderColors = new Float32Array(count.value * 4).fill(0.0)
 
   const useProjection = projectionMap && projectionMap.size > 0
   let minX = Infinity
@@ -141,7 +178,7 @@ function createInstancedMesh(
   const maxRange = useProjection ? Math.max(maxX - minX, maxY - minY) : 1
   const desiredScale = 50 // adjust as needed
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < count.value; i++) {
     const info = atlasInfoArray[i]
     const id = info.filename.toLowerCase().replace(/\.[^/.]+$/, '')
     const uvX = info.x / atlasTexture.image.width
@@ -167,6 +204,8 @@ function createInstancedMesh(
   geometry.setAttribute('instanceHighlight', new THREE.InstancedBufferAttribute(instanceHighlights, 1))
   geometry.setAttribute('instanceAspectRatio', new THREE.InstancedBufferAttribute(instanceAspectRatios, 1))
   geometry.setAttribute('instancePosition', new THREE.InstancedBufferAttribute(instancePositions, 3))
+  geometry.setAttribute('instanceGrayedOut', new THREE.InstancedBufferAttribute(instanceGrayedOut, 1))
+  geometry.setAttribute('instanceBorderColor', new THREE.InstancedBufferAttribute(borderColors, 4))
 
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -179,9 +218,9 @@ function createInstancedMesh(
     transparent: true,
   })
 
-  const instancedMesh = new THREE.InstancedMesh(geometry, material, count)
+  const instancedMesh = new THREE.InstancedMesh(geometry, material, count.value)
   const matrix = new THREE.Matrix4()
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < count.value; i++) {
     const x = instancePositions[i * 3]
     const y = instancePositions[i * 3 + 1]
     const z = instancePositions[i * 3 + 2]
@@ -223,7 +262,7 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
   const instanceCount = instancedMeshRef.value.count
 
   for (let i = 0; i < instanceCount; i++) {
-    const key = instanceToKeyMap.value.get(i)
+    const key = instanceToImageMap.value.get(i)
     if (!key)
       continue
 
@@ -332,7 +371,7 @@ function updateHoveredMesh(
         const sx = (screenPos.x + 1) * 0.5 * props.width
         const sy = (-screenPos.y + 1) * 0.5 * props.height
         if (pointInPolygon({ x: sx, y: sy }, lassoPolygon)) {
-          const key = instanceToKeyMap.value.get(instanceId)
+          const key = instanceToImageMap.value.get(instanceId)
           if (key)
             selectedKeys.add(key)
         }
@@ -344,7 +383,7 @@ function updateHoveredMesh(
     imageStore.batchSelect(selectedKeys)
     allMeshes.forEach((mesh) => {
       for (let instanceId = 0; instanceId < mesh.count; instanceId++) {
-        const key = instanceToKeyMap.value.get(instanceId)
+        const key = instanceToImageMap.value.get(instanceId)
         const highlight = (key && imageStore.selectedIds.has(key)) ? 1 : 0
         setInstanceHighlight(mesh, instanceId, highlight)
       }
@@ -357,8 +396,8 @@ function updateHoveredMesh(
     // Clear previous hover highlight if it's not the locked image
     if (lastHovered.index !== -1 && lastHovered.mesh
       && (!imageStore.isImageFocusLocked
-        || instanceToKeyMap.value.get(lastHovered.index) !== imageStore.focusedId)) {
-      const key = instanceToKeyMap.value.get(lastHovered.index)
+        || instanceToImageMap.value.get(lastHovered.index) !== imageStore.focusedId)) {
+      const key = instanceToImageMap.value.get(lastHovered.index)
       if (!key || !imageStore.selectedIds.has(key)) {
         setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
       }
@@ -379,7 +418,7 @@ function updateHoveredMesh(
       switch (interactionType) {
         case 'hover': {
           // Update hover state
-          const key = instanceToKeyMap.value.get(instanceId)
+          const key = instanceToImageMap.value.get(instanceId)
 
           if (!key || !imageStore.selectedIds.has(key)) {
             setInstanceHighlight(mesh, instanceId, 1)
@@ -417,7 +456,7 @@ function resetFocus() {
 
   // Clear highlight on the previously focused instance
   if (lastHovered.index !== -1 && lastHovered.mesh) {
-    const key = instanceToKeyMap.value.get(lastHovered.index)
+    const key = instanceToImageMap.value.get(lastHovered.index)
     if (!key || !imageStore.selectedIds.has(key)) {
       setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
     }
@@ -519,7 +558,7 @@ function handleMouseUp(event: MouseEvent) {
     const hitResult = findHoveredInstance()
 
     if (hitResult) {
-      const key = instanceToKeyMap.value.get(hitResult.instanceId)
+      const key = instanceToImageMap.value.get(hitResult.instanceId)
       if (key) {
         // If ctrl is pressed, handle selection toggling
         if (event.ctrlKey) {
@@ -650,11 +689,16 @@ onMounted(async () => {
   }
 
   const newMap = new Map<number, string>()
+  const reverseNewMap = new Map<string, number>()
   Array.from(imageStore.images.keys()).forEach((key, i) => {
     newMap.set(i, key)
+    reverseNewMap.set(key, i)
   })
-  instanceToKeyMap.value = newMap
-  console.log('Instance to key map:', instanceToKeyMap.value)
+  instanceToImageMap.value = newMap
+  imageToInstanceMap.value = reverseNewMap
+  labelStore.instanceToImageMap = instanceToImageMap.value
+  labelStore.imageToInstanceMap = imageToInstanceMap.value
+  console.log('Instance to key map:', instanceToImageMap.value)
 
   if (props.width <= 0 || props.height <= 0) {
     console.error('Invalid scene dimensions:', props.width, props.height)
@@ -745,6 +789,32 @@ onMounted(async () => {
   animate()
 })
 
+function parseColorToRGB(color) {
+  // Handle hex format (#RRGGBB)
+  if (color.startsWith('#')) {
+    const r = Number.parseInt(color.slice(1, 3), 16) / 255
+    const g = Number.parseInt(color.slice(3, 5), 16) / 255
+    const b = Number.parseInt(color.slice(5, 7), 16) / 255
+    return [r, g, b]
+  }
+
+  // Handle rgb format (rgb(r,g,b))
+  if (color.startsWith('rgb')) {
+    const matches = color.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/)
+    if (matches) {
+      return [
+        Number.parseInt(matches[1], 10) / 255,
+        Number.parseInt(matches[2], 10) / 255,
+        Number.parseInt(matches[3], 10) / 255,
+      ]
+    }
+  }
+
+  // Default to white if parsing fails
+  console.warn(`Failed to parse color: ${color}`)
+  return [0, 0, 0]
+}
+
 // Watch for changes in the current projection and update instance positions accordingly.
 watch(
   () => imageStore.currentProjection,
@@ -771,6 +841,47 @@ watch(
 watch(backgroundColor, (color) => {
   sceneRef.value!.background = color
 })
+
+watch(
+  [
+    () => [...labelStore.highlightedLabelIds],
+    () => labelStore.alphabets,
+    () => labelStore.imageToInstanceMap,
+  ],
+  () => {
+    const borderColors = new Float32Array(count.value * 4).fill(0.0)
+    const highlightedLabels = labelStore.highlightedLabels
+
+    Object.values(highlightedLabels).forEach(({ color, instanceIds }) => {
+
+      const splitHexColor = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color)
+
+      if (!splitHexColor) {
+        console.warn(`Invalid hex color: ${color}, defaulting to white`)
+        return [1, 1, 1] // Default to white if parsing fails
+      }
+
+      const r = Number.parseInt(splitHexColor[1], 16) / 255
+      const g = Number.parseInt(splitHexColor[2], 16) / 255
+      const b = Number.parseInt(splitHexColor[3], 16) / 255
+
+      // Update each instance's color in the borderColors array
+      instanceIds.forEach((instanceId) => {
+        const index = instanceId * 4
+        borderColors[index] = r
+        borderColors[index + 1] = g
+        borderColors[index + 2] = b
+        borderColors[index + 3] = 1.0
+      })
+    })
+
+    instancedMeshRef.value?.geometry.setAttribute(
+      'instanceBorderColor',
+      new THREE.InstancedBufferAttribute(borderColors, 4),
+    )
+  },
+  { deep: true },
+)
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
