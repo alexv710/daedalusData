@@ -216,7 +216,7 @@ function getDisplayName() {
         v-model="drawerRight"
         permanent
         location="right"
-        width="400"
+        width="450"
         class="pa-0"
       >
         <v-card flat>
