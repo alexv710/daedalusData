@@ -14,7 +14,6 @@ services:
       - node_modules:/app/frontend/node_modules
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=/data/db/app.db
       - JUPYTER_TOKEN=daedalus-dev
     command: >
       sh -c "rm -f /tmp/nitro/worker*.sock && 
@@ -25,13 +24,6 @@ services:
       --NotebookApp.token=daedalus-dev 
       --notebook-dir=/app/notebooks & 
       cd frontend && pnpm install && pnpm run dev"
-  init-db:
-    image: alpine:latest
-    volumes:
-      - ./data:/app/data
-      - ./backend:/app/backend
-      - ./scripts:/app/scripts
-    command: sh -c "apk add --no-cache sqlite && sqlite3 /data/db/app.db < /app/backend/schema.sql"
 
 volumes:
   node_modules:
