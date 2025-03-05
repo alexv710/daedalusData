@@ -267,6 +267,29 @@ export const useLabelStore = defineStore('labels', () => {
     await addImagesToLabel(selectedAlphabetId.value, selectedLabelId.value, selectedImageIds)
   }
 
+  async function removeSelectedImagesFromLabel() {
+    if (!selectedLabelId.value || !selectedAlphabetId.value)
+      return
+
+    const imageStore = useImageStore()
+    const selectedImageIds = Array.from(imageStore.selectedIds)
+
+    if (selectedImageIds.length === 0)
+      return
+
+    const alphabet = alphabets.value.find(a => a.id === selectedAlphabetId.value)
+    if (!alphabet)
+      return
+
+    const label = alphabet.labels.find(l => l.id === selectedLabelId.value)
+    if (!label || !label.images)
+      return
+
+    label.images = label.images.filter(id => !selectedImageIds.includes(id))
+
+    await saveAlphabet(alphabet)
+  }
+
   async function removeImageFromLabel(alphabetId: string, labelId: string, imageId: string) {
     const alphabet = alphabets.value.find(a => a.id === alphabetId)
     if (!alphabet)
@@ -317,6 +340,7 @@ export const useLabelStore = defineStore('labels', () => {
     clearLabelHighlight,
     addImagesToLabel,
     addSelectedImagesToLabel,
+    removeSelectedImagesFromLabel,
     removeImageFromLabel,
     getLabelImages,
     highlightedLabels,
