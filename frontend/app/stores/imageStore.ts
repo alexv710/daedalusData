@@ -12,6 +12,10 @@ export const useImageStore = defineStore('image', () => {
   const hoveredId = ref(null)
   const focusedId = ref(null)
   const isImageFocusLocked = ref(false)
+  const activeFilters = ref({})
+  const filteredImageIds = ref(new Set())
+  const instanceToImageMap = ref(new Map<number, string>())
+  const imageToInstanceMap = ref(new Map<string, number>())
 
   // For popup window management
   const imageDetailWindow = ref(null)
@@ -160,6 +164,208 @@ export const useImageStore = defineStore('image', () => {
 
     return result
   })
+
+  function initializeFilters() {
+    const newFilters = {}
+
+    // Set up for each available attribute
+    availableAttributes.value.forEach((attr) => {
+      // Determine if the attribute has numeric values
+      const isNumeric = availableNumericAttributes.value.includes(attr)
+
+      if (isNumeric) {
+        // For numeric attributes, store min/max range
+        let min = Infinity
+        let max = -Infinity
+
+        // Find the actual min/max values
+        images.value.forEach((img) => {
+          if (img && typeof img[attr] === 'number') {
+            min = Math.min(min, img[attr])
+            max = Math.max(max, img[attr])
+          }
+        })
+
+        // Initialize with full range (no filtering)
+        newFilters[attr] = {
+          type: 'numeric',
+          min,
+          max,
+          currentMin: min,
+          currentMax: max,
+          active: false,
+        }
+      }
+      else {
+        // For categorical attributes, get all possible values
+        const values = new Set()
+
+        images.value.forEach((img) => {
+          if (img && img[attr] !== undefined) {
+            values.add(String(img[attr]))
+          }
+        })
+
+        // Initialize with all values selected (no filtering)
+        newFilters[attr] = {
+          type: 'categorical',
+          values: Array.from(values).sort(),
+          selected: Array.from(values).sort(),
+          active: false,
+        }
+      }
+    })
+
+    activeFilters.value = newFilters
+  }
+
+  // Apply all active filters and update filteredImageIds
+  function applyFilters() {
+    // If no filters are active, include all images
+    const hasActiveFilters = Object.values(activeFilters.value).some(filter => filter.active)
+
+    if (!hasActiveFilters) {
+      // Get all instance IDs that have corresponding image keys
+      const allInstanceIds = new Set()
+
+      // Iterate through imageToInstanceMap to ensure we're getting valid mappings
+      imageKeys.value.forEach((imageKey) => {
+        const instanceId = imageToInstanceMap.value.get(imageKey)
+        if (instanceId !== undefined) {
+          allInstanceIds.add(instanceId)
+        }
+      })
+
+      filteredImageIds.value = allInstanceIds
+      return
+    }
+
+    // Filter the images based on active filters
+    const filtered = new Set()
+
+    imageKeys.value.forEach((id) => {
+      const img = images.value.get(id)
+      if (!img)
+        return
+
+      // Check if the image passes all active filters
+      const passesAllFilters = Object.entries(activeFilters.value).every(([attr, filter]) => {
+        // Skip inactive filters
+        if (!filter.active)
+          return true
+
+        const value = img[attr]
+
+        // Handle missing values - exclude by default when filter is active
+        if (value === undefined || value === null)
+          return false
+
+        if (filter.type === 'numeric') {
+          // For numeric filters, check if value is within range
+          return value >= filter.currentMin && value <= filter.currentMax
+        }
+        else if (filter.type === 'categorical') {
+          // For categorical filters, check if value is in selected values
+          return filter.selected.includes(String(value))
+        }
+
+        return true
+      })
+
+      if (passesAllFilters) {
+        filtered.add(id)
+      }
+    })
+
+    // Convert filtered image keys to instance IDs
+    filteredImageIds.value = new Set(
+      Array.from(filtered)
+        .map(imageKey => imageToInstanceMap.value.get(imageKey))
+        .filter(Boolean),
+    )
+  }
+
+  // Update a numerical filter
+  function updateNumericFilter(attribute, min, max) {
+    const filter = activeFilters.value[attribute]
+    if (!filter || filter.type !== 'numeric')
+      return
+
+    filter.currentMin = min
+    filter.currentMax = max
+    filter.active = (min > filter.min || max < filter.max)
+
+    applyFilters()
+  }
+
+  // Update a categorical filter
+  function updateCategoricalFilter(attribute, selected) {
+    const filter = activeFilters.value[attribute]
+    if (!filter || filter.type !== 'categorical')
+      return
+
+    filter.selected = selected
+    filter.active = (selected.length < filter.values.length)
+
+    applyFilters()
+  }
+
+  // Reset all filters
+  function resetFilters() {
+    Object.keys(activeFilters.value).forEach((attr) => {
+      const filter = activeFilters.value[attr]
+
+      if (filter.type === 'numeric') {
+        filter.currentMin = filter.min
+        filter.currentMax = filter.max
+      }
+      else if (filter.type === 'categorical') {
+        filter.selected = [...filter.values]
+      }
+
+      filter.active = false
+    })
+
+    applyFilters()
+  }
+
+  // Reset a specific filter
+  function resetFilter(attribute) {
+    const filter = activeFilters.value[attribute]
+    if (!filter)
+      return
+
+    if (filter.type === 'numeric') {
+      filter.currentMin = filter.min
+      filter.currentMax = filter.max
+    }
+    else if (filter.type === 'categorical') {
+      filter.selected = [...filter.values]
+    }
+
+    filter.active = false
+    applyFilters()
+  }
+
+  // Initialize filters after loading metadata
+  const originalLoadImageMetadata = loadImageMetadata
+  loadImageMetadata = async function () {
+    await originalLoadImageMetadata()
+    initializeFilters()
+    applyFilters()
+  }
+
+  // Computed property to get filtered images
+  const filteredImages = computed(() =>
+    Array.from(filteredImageIds.value)
+      .flatMap((instanceId) => {
+        const imageKey = instanceToImageMap.value[instanceId]
+        return imageKey ? [images.value.get(imageKey)] : []
+      }),
+  )
+
+  // Count of filtered images
+  const filteredImageCount = computed(() => filteredImageIds.value.size)
 
   // Actions for selection.
   function clearSelection() {
@@ -365,6 +571,18 @@ export const useImageStore = defineStore('image', () => {
     updateDetailWindow,
     toggleDetailWindow,
     isDetailWindowOpen,
+    activeFilters,
+    filteredImageIds,
+    filteredImages,
+    filteredImageCount,
+    initializeFilters,
+    applyFilters,
+    updateNumericFilter,
+    updateCategoricalFilter,
+    resetFilters,
+    resetFilter,
+    imageToInstanceMap,
+    instanceToImageMap,
   }
 })
 

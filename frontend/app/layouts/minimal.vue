@@ -163,6 +163,13 @@ function getDisplayName() {
               <LabelAlphabetManager />
             </v-card>
           </v-list-item>
+          <v-divider class="ma-0" />
+          <!-- Image Filters -->
+          <v-list-item class="pa-0">
+            <v-card flat tile class="pa-0">
+              <ImageFilters />
+            </v-card>
+          </v-list-item>
         </v-list>
       </v-navigation-drawer>
 
