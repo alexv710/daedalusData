@@ -14,6 +14,7 @@ const emit = defineEmits(['imageFocusChange'])
 // ----- Pinia Store Integration -----
 const imageStore = useImageStore()
 const labelStore = useLabelStore()
+const { selectedInstanceIds } = storeToRefs(imageStore)
 
 // vuetify theme for color mode
 const colorMode = useColorMode()
@@ -210,7 +211,7 @@ function createInstancedMesh(
   const material = new THREE.ShaderMaterial({
     uniforms: {
       map: { value: atlasTexture },
-      highlightColor: { value: new THREE.Color(0xFF0000) },
+      highlightColor: { value: new THREE.Color(0x0f08c9) },
       highlightIntensity: { value: 0.5 },
     },
     vertexShader,
@@ -298,7 +299,7 @@ function setupControls(camera: THREE.Camera, rendererElement: HTMLElement): Arcb
   controls.maxDistance = 100
   controls.enablePan = true
   controls.panSpeed = 0.5
-  controls.setGizmosVisible(true)
+  controls.setGizmosVisible(false)
   return controls
 }
 
@@ -700,7 +701,6 @@ onMounted(async () => {
   labelStore.imageToInstanceMap = imageToInstanceMap.value
   imageStore.instanceToImageMap = instanceToImageMap.value
   imageStore.imageToInstanceMap = imageToInstanceMap.value
-  console.log('Instance to key map:', instanceToImageMap.value)
 
   if (props.width <= 0 || props.height <= 0) {
     console.error('Invalid scene dimensions:', props.width, props.height)
@@ -880,6 +880,14 @@ watch(
   },
   { deep: true },
 )
+
+watch(selectedInstanceIds, () => {
+  const instanceHighlights = new Float32Array(count.value)
+  selectedInstanceIds.value.forEach((instanceId) => {
+    instanceHighlights[instanceId] = 1
+  })
+  instancedMeshRef.value?.geometry.setAttribute('instanceHighlight', new THREE.InstancedBufferAttribute(instanceHighlights, 1))
+}, { deep: true })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)

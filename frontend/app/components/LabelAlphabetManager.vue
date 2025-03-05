@@ -11,15 +11,11 @@ const isEditing = ref(false)
 const formType = ref<'Label Alphabet' | 'Label'>('Label Alphabet')
 const formState = ref({ name: '', description: '', color: '#000000', alphabetId: '' })
 const editingItem = ref<any>(null)
+const labelSelectionMode = ref(false)
 
 // Drag and drop state
 const isDragging = ref(false)
 const dragData = ref<{ label: any, sourceAlphabetId: string } | null>(null)
-
-// Feedback message management
-const feedback = ref('')
-const showFeedback = ref(false)
-const feedbackTimeout = ref<number | null>(null)
 
 // Computed properties
 const hasSelectedImages = computed(() => imageStore.selectedIds.size > 0)
@@ -27,11 +23,33 @@ const selectedImagesCount = computed(() => imageStore.selectedIds.size)
 const alphabetOptions = computed(() =>
   labelStore.alphabets.map(a => ({ title: a.name, value: a.id })),
 )
+// Add this computed property to track image selection status for each label
+const labelSelectionStatus = computed(() => {
+  const status = {}
 
-// Watch for selected label changes
-watch(() => labelStore.selectedLabel, (newValue) => {
-  if (newValue)
-    showAssignFeedback()
+  labelStore.alphabets.forEach((alphabet) => {
+    alphabet.labels.forEach((label) => {
+      if (!label.images || label.images.length === 0) {
+        status[label.id] = 'none'
+        return
+      }
+
+      const totalImages = label.images.length
+      const selectedCount = label.images.filter(id => imageStore.selectedIds.has(id)).length
+
+      if (selectedCount === 0) {
+        status[label.id] = 'none'
+      }
+      else if (selectedCount === totalImages) {
+        status[label.id] = 'all'
+      }
+      else {
+        status[label.id] = 'partial'
+      }
+    })
+  })
+
+  return status
 })
 
 // Alphabet management
@@ -169,13 +187,29 @@ function onDragEnd() {
   dragData.value = null
 }
 
-// Label selection handling
+function isLabelSelected(label: any, alphabetId: string): boolean {
+  return labelStore.selectedLabelId === label.id
+    && labelStore.selectedAlphabetId === alphabetId
+}
+
+function isLabelHighlighted(label: any): boolean {
+  return labelStore.highlightedLabelIds.has(label.id)
+}
+
 function selectLabel(label: any, alphabetId: string, event: MouseEvent) {
   // Skip selection if close button was clicked
   if ((event.target as HTMLElement).closest('.v-chip__close')) {
     return
   }
 
+  // If in label selection mode, directly toggle images
+  if (labelSelectionMode.value) {
+    imageStore.addManySelection(label.images)
+    event.stopPropagation()
+    return
+  }
+
+  // Normal label selection behavior (for assignment)
   const isSelected = labelStore.selectedLabelId === label.id
     && labelStore.selectedAlphabetId === alphabetId
 
@@ -184,46 +218,13 @@ function selectLabel(label: any, alphabetId: string, event: MouseEvent) {
   }
   else {
     labelStore.selectLabel(alphabetId, label.id)
-    showAssignFeedback()
   }
 
   event.stopPropagation()
 }
 
-function isLabelSelected(label: any, alphabetId: string): boolean {
-  return labelStore.selectedLabelId === label.id
-    && labelStore.selectedAlphabetId === alphabetId
-}
-
-// Image assignment functions
-async function assignSelectedImages() {
-  if (!labelStore.selectedLabel)
-    return
-
-  await labelStore.addSelectedImagesToLabel()
-
-  showFeedback.value = true
-  feedback.value = `✓ Added ${selectedImagesCount.value} images to "${labelStore.selectedLabel.value}"`
-
-  if (feedbackTimeout.value)
-    clearTimeout(feedbackTimeout.value)
-  feedbackTimeout.value = window.setTimeout(() => {
-    showFeedback.value = false
-  }, 3000)
-}
-
-function showAssignFeedback() {
-  if (!labelStore.selectedLabel || !hasSelectedImages.value)
-    return
-
-  showFeedback.value = true
-  feedback.value = `${selectedImagesCount.value} images ready to assign to "${labelStore.selectedLabel.value}"`
-
-  if (feedbackTimeout.value)
-    clearTimeout(feedbackTimeout.value)
-  feedbackTimeout.value = window.setTimeout(() => {
-    showFeedback.value = false
-  }, 5000)
+function clearAllSelections() {
+  imageStore.clearSelection()
 }
 
 // Load data on component mount
@@ -241,15 +242,32 @@ onMounted(async () => {
 
     <v-card-text class="m-0 p-1">
       <v-container fluid>
-        <!-- Assignment button -->
-        <v-row class="justify-center">
-          <v-btn
-            v-if="labelStore.selectedLabel && hasSelectedImages"
-            color="success"
-            size="small"
-            @click="assignSelectedImages"
-          >
-            Assign {{ selectedImagesCount }} Images
+        <!-- Button for toggling selection mode -->
+        <v-row class="align-center" justify="center">
+          <p>What happens when you left click a label:</p>
+          <v-col cols="auto">
+            Assign to Label
+          </v-col>
+          <v-col cols="auto">
+            <v-switch
+              :model-value="labelSelectionMode"
+              color="primary"
+              hide-details
+              inset
+            />
+          </v-col>
+          <v-col cols="auto">
+            Select Images
+          </v-col>
+        </v-row>
+
+        <!-- Clear selections button (only visible in selection mode if images are selected) -->
+        <v-row v-if="labelSelectionMode && selectedImagesCount > 0" class="mb-2 justify-center">
+          <v-btn color="error" size="small" @click="clearAllSelections">
+            <v-icon size="small" class="mr-1">
+              mdi-close-circle
+            </v-icon>
+            Clear Selections
           </v-btn>
         </v-row>
 
@@ -309,23 +327,48 @@ onMounted(async () => {
               :color="label.color || 'grey lighten-2'"
               :variant="isLabelSelected(label, alphabet.id) ? 'elevated' : 'flat'"
               class="m-1 transition-all duration-100 hover:translate-y-[-1px] hover:transform hover:shadow-sm"
-              :class="{ 'font-bold shadow-primary': isLabelSelected(label, alphabet.id) }"
+              :class="{
+                'font-bold shadow-primary': isLabelHighlighted(label, alphabet.id),
+              }"
               close
               :draggable="true"
               @click.left="selectLabel(label, alphabet.id, $event)"
               @click.right.prevent="menu = false"
               @click.right="labelStore.highlightLabel(label.id)"
-              @click:close="labelStore.removeLabel(alphabet.id, label.id)"
               @dblclick="openEditLabel(label, alphabet.id)"
+
               @dragstart="onDragStart($event, label, alphabet.id)"
               @dragend="onDragEnd"
             >
               <v-tooltip location="bottom">
                 <template #activator="{ props }">
-                  <span v-bind="props">
-                    {{ label.value }}
-                    <v-icon v-if="isLabelSelected(label, alphabet.id)" size="x-small" class="ml-1">
+                  <span v-bind="props" class="flex items-center">
+                    <!-- Left: Selection status indicator -->
+                    <v-icon
+                      v-if="labelSelectionStatus[label.id] === 'all'"
+                      size="x-small"
+                      class="mr-1"
+                    >
                       mdi-check-circle
+                    </v-icon>
+                    <v-icon
+                      v-else-if="labelSelectionStatus[label.id] === 'partial'"
+                      size="x-small"
+                      class="mr-1"
+                    >
+                      mdi-circle-half-full
+                    </v-icon>
+
+                    <!-- Label text -->
+                    {{ label.value }}
+
+                    <!-- Right: Assignment selection icon -->
+                    <v-icon
+                      v-if="isLabelSelected(label, alphabet.id)"
+                      size="x-small"
+                      class="ml-1"
+                    >
+                      mdi-check
                     </v-icon>
                   </span>
                 </template>
@@ -333,10 +376,33 @@ onMounted(async () => {
                   <strong>{{ label.value }}</strong><br>
                   {{ label.description }}<br>
                   <template v-if="label.images && label.images.length > 0">
-                    {{ label.images.length }} images assigned
+                    {{ label.images.length }} images assigned<br>
+                    <span v-if="labelSelectionStatus[label.id] === 'all'">
+                      All images selected
+                    </span>
+                    <span v-else-if="labelSelectionStatus[label.id] === 'partial'">
+                      Some images selected
+                    </span>
+                    <span v-else>
+                      No images selected
+                    </span>
+                    <br>
+                    <em v-if="labelSelectionMode" class="text-xs">
+                      Double click to edit <br>
+                      Left click to add images to the selection <br>
+                      Right click to highlight all images of this label
+                    </em>
+                    <em v-if="!labelSelectionMode" class="text-xs">
+                      Double click to edit <br>
+                      Left click to enable assigning images to this label <br>
+                      Right click to highlight all images of this label
+                    </em>
                   </template>
                   <template v-else>
-                    No images assigned
+                    No images assigned <br>
+                    <em v-if="!labelSelectionMode" class="text-xs">
+                      Left click to enable assigning images to this label
+                    </em>
                   </template>
                 </span>
               </v-tooltip>
@@ -363,17 +429,25 @@ onMounted(async () => {
         </v-btn>
       </v-row>
 
-      <!-- Feedback message -->
-      <v-row class="mt-5 justify-center">
-        <v-fade-transition>
-          <v-chip
-            v-if="showFeedback"
-            color="info"
-            class="mr-2"
-          >
-            {{ feedback }}
-          </v-chip>
-        </v-fade-transition>
+      <!-- Assignment button -->
+      <v-row class="justify-center">
+        <v-btn
+          v-if="labelStore.selectedLabel && hasSelectedImages"
+          class="mb-2"
+          color="error"
+          size="small"
+          @click="labelStore.removeSelectedImagesFromLabel()"
+        >
+          Remove {{ selectedImagesCount }} Images from "{{ labelStore.selectedLabel.value }}"
+        </v-btn>
+        <v-btn
+          v-if="labelStore.selectedLabel && hasSelectedImages"
+          color="success"
+          size="small"
+          @click="labelStore.addSelectedImagesToLabel()"
+        >
+          Assign {{ selectedImagesCount }} Images to "{{ labelStore.selectedLabel.value }}"
+        </v-btn>
       </v-row>
     </v-card-text>
 
