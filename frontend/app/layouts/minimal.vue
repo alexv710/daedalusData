@@ -128,10 +128,10 @@ function getDisplayName() {
           DaedalusData
         </v-app-bar-title>
         <v-spacer />
-        <v-btn variant="text" class="text-sm mr-4" to="/">
+        <v-btn variant="text" class="mr-4 text-sm" to="/">
           Home
         </v-btn>
-        <v-btn variant="text" class="text-sm mr-4" to="/analysis">
+        <v-btn variant="text" class="mr-4 text-sm" to="/analysis">
           Analysis
         </v-btn>
         <DarkToggle class="mr-4" />
@@ -175,7 +175,7 @@ function getDisplayName() {
         <div class="relative h-full">
           <slot />
           <!-- Small toolbar at the bottom for status info -->
-          <div class="bottom-toolbar border-t border-gray-300 px-4 py-2 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+          <div class="bottom-toolbar border-t border-gray-300 bg-gray-100 px-4 py-2 dark:border-gray-700 dark:bg-gray-800">
             <div class="flex items-center justify-between">
               <div class="flex items-center">
                 <span v-if="displayedImage" class="mr-4 text-sm">
