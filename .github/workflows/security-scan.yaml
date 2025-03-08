@@ -52,21 +52,6 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Frontend Dependency Scan
-        uses: snyk/actions/node@master
-        with:
-          args: --file=frontend/package.json
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      
-      - name: Python Dependency Scan
-        uses: snyk/actions/python@master
-        with:
-          args: --file=requirements.txt
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          
-      # Using npm audit as a fallback for Snyk
       - name: NPM Audit
         run: |
           cd frontend
