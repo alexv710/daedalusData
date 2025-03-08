@@ -244,6 +244,8 @@ function createInstancedMesh(
     vertexShader,
     fragmentShader,
     transparent: true,
+    alphaTest: 0.01,
+    depthWrite: false,
   })
 
   const instancedMesh = new THREE.InstancedMesh(geometry, material, count.value)
@@ -438,6 +440,18 @@ function updateSpread() {
   console.log('Updating spread factor:', spreadFactor.value)
   if (currentProjectionData.value.length > 0) {
     updateInstancePositions(currentProjectionData.value)
+  }
+}
+
+function initializeRendering() {
+  if (instancedMeshRef.value) {
+    // Force material to update all properties
+    instancedMeshRef.value.material.needsUpdate = true
+
+    // Force a single render frame
+    if (rendererRef.value && cameraRef.value && sceneRef.value) {
+      rendererRef.value.render(sceneRef.value, cameraRef.value)
+    }
   }
 }
 
@@ -846,18 +860,6 @@ onBeforeMount(async () => {
   await imageStore.loadProjections()
 })
 
-function initializeRendering() {
-  if (instancedMeshRef.value) {
-    // Force material to update all properties
-    instancedMeshRef.value.material.needsUpdate = true;
-    
-    // Force a single render frame
-    if (rendererRef.value && cameraRef.value && sceneRef.value) {
-      rendererRef.value.render(sceneRef.value, cameraRef.value);
-    }
-  }
-}
-
 onMounted(async () => {
   if (imageStore.images.size === 0) {
     await imageStore.loadImageMetadata()
@@ -914,6 +916,7 @@ onMounted(async () => {
       '/data/atlas.png',
       async (texture) => {
         texture.flipY = false
+
         // If a current projection is set, try to fetch its data to build a projection map.
         let projectionMap: Map<string, { x: number, y: number }> | undefined
         if (imageStore.currentProjection) {
@@ -935,12 +938,20 @@ onMounted(async () => {
             console.error('Error fetching projection data:', error)
           }
         }
+
         // Create the instanced mesh using the projection map if available.
         const instancedMesh = createInstancedMesh(texture, atlasData, projectionMap)
         instancedMeshRef.value = instancedMesh
         sceneRef.value.add(instancedMesh)
+
+        initializeRendering()
+
+        // Only update positions if we have projection data
+        if (currentProjectionData.value.length > 0) {
+          updateInstancePositions(currentProjectionData.value)
+        }
+
         // Start animation loop.
-        updateSpread()
         animate()
       },
       undefined,
