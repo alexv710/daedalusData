@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const colorMode = useColorMode()
+
 interface FileInfo {
   name: string
   size: number
@@ -69,12 +71,19 @@ function checkStepStatus() {
 
 function checkAtlasExists() {
   // Perform a HEAD request to check for the atlas file
-  fetch('/data/atlas.png', { method: 'HEAD' })
+  fetch('/data/atlas.png', {
+    method: 'HEAD',
+    // Add cache-busting to ensure we're not getting cached responses
+    headers: { 'Cache-Control': 'no-cache' },
+  })
     .then((res) => {
       atlasExists.value = res.ok
       if (res.ok) {
         // Also check for atlas.json to ensure the metadata exists
-        return fetch('/data/atlas.json', { method: 'HEAD' })
+        return fetch('/data/atlas.json', {
+          method: 'HEAD',
+          headers: { 'Cache-Control': 'no-cache' },
+        })
       }
       return Promise.resolve({ ok: false })
     })
@@ -83,7 +92,8 @@ function checkAtlasExists() {
       atlasExists.value = atlasExists.value && res.ok
       checkStepStatus()
     })
-    .catch(() => {
+    .catch((error) => {
+      console.warn('Atlas check failed:', error)
       atlasExists.value = false
       checkStepStatus()
     })
@@ -216,6 +226,10 @@ onMounted(async () => {
   }
 })
 
+function refreshPage() {
+  window.location.reload()
+}
+
 // Make sure to clean up on component unmount
 onUnmounted(() => {
   stopPollingAtlasStatus()
@@ -242,19 +256,68 @@ onUnmounted(() => {
         </div>
 
         <div v-else>
-          <v-stepper v-model="activeStep" class="elevation-0">
+          <div class="mb-4 flex items-center justify-between">
+            <div class="text-lg font-medium">
+              Workflow Progress
+            </div>
+            <div class="flex items-center gap-2">
+              <DarkToggle class="mr-5" />
+              <v-btn
+                icon="mdi-refresh"
+                variant="text"
+                color="primary"
+                size="small"
+                title="Refresh page"
+                @click="refreshPage"
+              >
+                Refresh
+              </v-btn>
+            </div>
+          </div>
+
+          <v-stepper
+            v-model="activeStep"
+            class="elevation-0"
+            editable
+          >
             <v-stepper-header>
               <template v-for="(step, i) in steps" :key="i">
                 <v-stepper-item
                   :value="i"
                   :complete="step.completed"
                   :title="step.name"
-                  :icon="step.icon"
-                />
+                  :icon="step.completed ? 'mdi-check-circle' : step.icon"
+                  complete-icon="mdi-check-circle"
+                  :disabled="false"
+                  :editable="true"
+                  class="cursor-pointer"
+                >
+                  <template #title>
+                    <div class="flex items-center gap-1">
+                      {{ step.name }}
+                      <v-tooltip v-if="step.tooltip" location="bottom">
+                        <template #activator="{ props }">
+                          <v-icon
+                            size="small"
+                            v-bind="props"
+                            icon="mdi-information-outline"
+                            class="text-gray-500"
+                          />
+                        </template>
+                        {{ step.tooltip }}
+                      </v-tooltip>
+                    </div>
+                  </template>
+                </v-stepper-item>
 
                 <v-divider v-if="i < steps.length - 1" />
               </template>
             </v-stepper-header>
+
+            <!-- Helper text to inform users they can navigate freely -->
+            <div class="mb-2 mt-1 px-2 text-center text-xs text-gray-500 dark:text-gray-400">
+              Click on any step to navigate through the workflow
+            </div>
 
             <v-stepper-window>
               <!-- Step 1: Images -->
@@ -353,7 +416,7 @@ onUnmounted(() => {
                         <li>The format should be a flat JSON object where keys are image names (without file extension)</li>
                         <li>
                           Example: <code>images.json</code> with content like:
-                          <pre class="mt-2 overflow-x-auto rounded bg-gray-100 p-2">
+                          <pre class="mt-2 overflow-x-auto rounded p-2">
 {
   "image1": {
     "type": "sample",
@@ -504,10 +567,19 @@ onUnmounted(() => {
                         Atlas Preview
                       </h3>
                       <img
-                        src="/data/atlas.png"
+                        v-if="atlasExists"
+                        :src="`/data/atlas.png?t=${Date.now()}`"
                         alt="Atlas"
                         class="h-64 w-full border rounded object-contain"
                       >
+                      <div
+                        v-else
+                        class="h-64 w-full flex items-center justify-center border rounded bg-gray-100"
+                      >
+                        <p class="text-gray-500">
+                          Atlas preview not available
+                        </p>
+                      </div>
                     </div>
 
                     <div class="mt-4 flex flex-wrap gap-2">
@@ -657,7 +729,7 @@ onUnmounted(() => {
             </h3>
             <!-- -1 because of the manifest file -->
             <p class="mt-2 text-2xl font-bold">
-              {{ dataset.projections.length - 1 }}
+              {{ Math.max(0, dataset.projections.length - 1) }}
             </p>
             <p v-if="dataset.projections.length > 0" class="text-sm text-gray-600">
               Latest: {{ dataset.projections[0]?.name }}

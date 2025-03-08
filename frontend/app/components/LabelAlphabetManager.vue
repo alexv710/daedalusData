@@ -250,7 +250,7 @@ onMounted(async () => {
           </v-col>
           <v-col cols="auto">
             <v-switch
-              :model-value="labelSelectionMode"
+              v-model="labelSelectionMode"
               color="primary"
               hide-details
               inset

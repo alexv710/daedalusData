@@ -6,7 +6,11 @@ DaedalusData is an open-source platform for the exploration, visualization, and 
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-![DaedalusData Screenshot](docs/screenshot1.png)
+![DaedalusData Screenshot](docs/analysis-page.png)
+
+<br>
+
+![Data Preparation](docs/index-page.gif)
 
 ## Features
 
