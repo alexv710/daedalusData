@@ -33,7 +33,7 @@ const instancedMeshRef = shallowRef<THREE.InstancedMesh | null>(null)
 const count = ref(0)
 const spreadFactor = ref(1.1)
 const imageSize = ref(1.0)
-const repulsionStrength = ref(1.0)
+const repulsionStrength = ref(0.1)
 const currentProjectionData = ref<any[]>([])
 const isControlsOpen = ref(true)
 
@@ -1259,13 +1259,13 @@ defineExpose({
     >
       <!-- Toggle button -->
       <button
-        class="absolute top-2 h-6 w-6 flex items-center justify-center rounded-full bg-gray-200 text-gray-700 shadow-md -left-3 dark:bg-gray-700 hover:bg-gray-300 dark:text-gray-200 dark:hover:bg-gray-600"
+        class="absolute top-2 h-8 w-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-700 shadow-md -left-6 dark:bg-gray-700 hover:bg-gray-300 dark:text-gray-200 dark:hover:bg-gray-600"
         :title="isControlsOpen ? 'Collapse controls' : 'Expand controls'"
         @click="isControlsOpen = !isControlsOpen"
       >
         <v-icon
           :icon="isControlsOpen ? 'mdi-chevron-right' : 'mdi-chevron-left'"
-          size="small"
+          size="large"
         />
       </button>
 
@@ -1315,6 +1315,7 @@ defineExpose({
             <span>Weak</span>
             <span>Strong</span>
           </div>
+          <v-divider class="my-2" />
         </div>
 
         <!-- Image Size slider -->
@@ -1339,9 +1340,9 @@ defineExpose({
         </div>
 
         <div class="mt-3 text-xs">
-          <p>Use Global Spread to scale the whole visualization</p>
-          <p>Use Repulsion Force to avoid local overlapping</p>
-          <p>Adjust Image Size to control detail visibility</p>
+            <p><strong>- Global Spread</strong> to scale all images</p>
+            <p><strong>- Repulsion Force</strong> for local overplotting</p>
+            <p><strong>- Image Size</strong> to control detail visibility</p>
         </div>
       </div>
 
