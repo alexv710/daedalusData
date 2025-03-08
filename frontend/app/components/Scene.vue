@@ -31,6 +31,9 @@ const rendererRef = ref<THREE.WebGLRenderer | null>(null)
 const sceneRef = shallowRef<THREE.Scene | null>(null)
 const instancedMeshRef = shallowRef<THREE.InstancedMesh | null>(null)
 const count = ref(0)
+const spreadFactor = ref(1.0)
+const repulsionStrength = ref(1.0)
+const currentProjectionData = ref<any[]>([])
 
 // ----- Raycasting & Lasso Handling -----
 const raycaster = new THREE.Raycaster()
@@ -50,7 +53,7 @@ const dragThreshold = 5
 const lastHovered = { index: -1, mesh: null }
 const leftClickStartPos = ref<THREE.Vector2 | null>(null)
 const hoveredInstanceId = ref(-1)
-// NEW: Lasso shape drawing state
+// Lasso shape drawing state
 const lassoShapePoints = ref<THREE.Vector3[]>([])
 const lassoShapeMesh = shallowRef<THREE.Mesh | null>(null)
 
@@ -85,7 +88,12 @@ varying float vInstanceGrayedOut;
 varying vec4 vInstanceUV;
 varying vec4 vInstanceBorderColor;
 void main() {
-    vUV = instanceUV.xy + instanceUV.zw * uv;
+    // UV mapping: instanceUV contains [u, v, width, height]
+    // We map the unit quad (0-1) to the correct position in the atlas
+    vUV = vec2(
+      instanceUV.x + instanceUV.z * uv.x,
+      instanceUV.y + instanceUV.w * (1.0 - uv.y)
+    );
     vHighlight = instanceHighlight;
     vInstanceGrayedOut = instanceGrayedOut;
     vInstanceUV = instanceUV;
@@ -112,9 +120,12 @@ varying vec4 vInstanceBorderColor;
 void main() {
     float borderThickness = 0.02;
     
-    // Calculate instance-specific normalized UV coordinates
-    // This converts the global vUV back to a 0-1 range for each instance
-    vec2 instanceLocalUV = (vUV - vInstanceUV.xy) / vInstanceUV.zw;
+    // Calculate local UV coordinates for border detection
+    // First convert back to 0-1 range within this instance
+    vec2 instanceLocalUV = vec2(
+        (vUV.x - vInstanceUV.x) / vInstanceUV.z,
+        (vUV.y - vInstanceUV.y) / vInstanceUV.w
+    );
     
     bool isBorder = 
         instanceLocalUV.x < borderThickness || 
@@ -168,6 +179,11 @@ function createInstancedMesh(
   let maxX = -Infinity
   let minY = Infinity
   let maxY = -Infinity
+  let maxImageArea = 0
+  atlasInfoArray.forEach((info) => {
+    const area = info.width * info.height
+    maxImageArea = Math.max(maxImageArea, area)
+  })
   if (useProjection) {
     projectionMap.forEach((coord) => {
       minX = Math.min(minX, coord.x)
@@ -179,26 +195,37 @@ function createInstancedMesh(
   const maxRange = useProjection ? Math.max(maxX - minX, maxY - minY) : 1
   const desiredScale = 50 // adjust as needed
 
+  // Texture dimensions for normalization
+  const textureWidth = atlasTexture.image.width
+  const textureHeight = atlasTexture.image.height
+
   for (let i = 0; i < count.value; i++) {
     const info = atlasInfoArray[i]
     const id = info.filename.toLowerCase().replace(/\.[^/.]+$/, '')
-    const uvX = info.x / atlasTexture.image.width
-    const uvWidth = info.width / atlasTexture.image.width
-    const uvHeight = info.height / atlasTexture.image.height
-    const uvH = -uvHeight
-    const uvY = info.y / atlasTexture.image.height - uvH
-    instanceUVs.set([uvX, uvY, uvWidth, uvH], i * 4)
 
+    // Fixed UV calculation
+    // UV is organized as [left, top, width, height]
+    const u = info.x / textureWidth
+    const v = info.y / textureHeight
+    const w = info.width / textureWidth
+    const h = info.height / textureHeight
+
+    instanceUVs.set([u, v, w, h], i * 4)
     instanceHighlights[i] = 0.0
     instanceAspectRatios[i] = info.width / info.height
 
     const coords = projectionMap!.get(id)!
-    const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale
-    const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale
+    const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale * spreadFactor.value
+    const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale * spreadFactor.value
+
+    // Calculate Z-position based on image size (larger images go further back)
+    const imageArea = info.width * info.height
+    const normalizedSize = imageArea / maxImageArea
+    const zOffset = -normalizedSize * 0.3 + Math.random() * 0.01
+
     instancePositions[i * 3] = scaledX
     instancePositions[i * 3 + 1] = scaledY
-
-    instancePositions[i * 3 + 2] = 0
+    instancePositions[i * 3 + 2] = zOffset
   }
 
   geometry.setAttribute('instanceUV', new THREE.InstancedBufferAttribute(instanceUVs, 4))
@@ -211,12 +238,14 @@ function createInstancedMesh(
   const material = new THREE.ShaderMaterial({
     uniforms: {
       map: { value: atlasTexture },
-      highlightColor: { value: new THREE.Color(0x0f08c9) },
+      highlightColor: { value: new THREE.Color(0x0F08C9) },
       highlightIntensity: { value: 0.5 },
     },
     vertexShader,
     fragmentShader,
     transparent: true,
+    alphaTest: 0.01,
+    depthWrite: false,
   })
 
   const instancedMesh = new THREE.InstancedMesh(geometry, material, count.value)
@@ -229,14 +258,119 @@ function createInstancedMesh(
     instancedMesh.setMatrixAt(i, matrix)
   }
   instancedMesh.instanceMatrix.needsUpdate = true
+
+  // Apply force-directed repulsion
+  if (spreadFactor.value > 1.0) {
+    applyRepulsionForces(instancedMesh, 10)
+  }
+
   return instancedMesh
 }
 
+/**
+ * Apply force-directed repulsion to avoid overlapping instances
+ * @param mesh The instanced mesh
+ * @param iterations Number of iterations to run the algorithm
+ */
+function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
+  if (!mesh)
+    return
+
+  const instanceCount = mesh.count
+  const positions = []
+  const zValues = []
+  const tempMatrix = new THREE.Matrix4()
+  const tempPosition = new THREE.Vector3()
+  const repFactor = (spreadFactor.value - 1) * repulsionStrength.value
+
+  // If spread factor is 1 or below, no repulsion needed
+  if (repFactor <= 0)
+    return
+
+  // Extract current positions
+  for (let i = 0; i < instanceCount; i++) {
+    mesh.getMatrixAt(i, tempMatrix)
+    tempPosition.setFromMatrixPosition(tempMatrix)
+    positions.push({ x: tempPosition.x, y: tempPosition.y })
+    zValues.push(tempPosition.z)
+  }
+
+  // Calculate sizes for overlapping detection
+  const sizes = []
+  const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
+  for (let i = 0; i < instanceCount; i++) {
+    const aspectRatio = aspectRatios.getX(i)
+    const width = Math.max(1, aspectRatio)
+    const height = Math.max(1, 1 / aspectRatio)
+    sizes.push({ width, height })
+  }
+
+  // Run multiple iterations for stability
+  for (let iter = 0; iter < iterations; iter++) {
+    // For each pair of instances, calculate repulsion
+    for (let i = 0; i < instanceCount; i++) {
+      const forces = { x: 0, y: 0 }
+
+      for (let j = 0; j < instanceCount; j++) {
+        if (i === j)
+          continue
+
+        const posI = positions[i]
+        const posJ = positions[j]
+
+        // Calculate distance between centers
+        const dx = posJ.x - posI.x
+        const dy = posJ.y - posI.y
+        const distanceSquared = dx * dx + dy * dy
+
+        // Skip if too far apart (optimization)
+        if (distanceSquared > 25)
+          continue
+
+        // Avoid division by zero
+        const distance = Math.max(0.1, Math.sqrt(distanceSquared))
+
+        // Calculate repulsion force - stronger when closer
+        const force = repFactor / (distance * distance)
+
+        // Apply force vector
+        const forceX = (dx / distance) * force
+        const forceY = (dy / distance) * force
+
+        // Accumulate forces (negative because we want repulsion)
+        forces.x -= forceX
+        forces.y -= forceY
+      }
+
+      // Apply accumulated forces (dampen for stability)
+      const damping = 0.3
+      positions[i].x += forces.x * damping
+      positions[i].y += forces.y * damping
+    }
+  }
+
+  // Apply updated positions back to the mesh
+  for (let i = 0; i < instanceCount; i++) {
+    tempMatrix.makeTranslation(
+      positions[i].x,
+      positions[i].y,
+      zValues[i],
+    )
+    mesh.setMatrixAt(i, tempMatrix)
+  }
+
+  mesh.instanceMatrix.needsUpdate = true
+}
+
 function updateInstancePositions(projectionData: { image: string, UMAP1: number, UMAP2: number }[]) {
+  console.log('Updating instance positions with projection data and spread factor:', spreadFactor.value)
   if (!instancedMeshRef.value) {
     console.warn('No instanced mesh available to update.')
     return
   }
+
+  // Store the projection data for later use when spread factor changes
+  currentProjectionData.value = projectionData
 
   const projectionMap = new Map<string, { x: number, y: number }>()
   projectionData.forEach((item) => {
@@ -259,6 +393,16 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
   const maxRange = Math.max(rangeX, rangeY)
   const desiredScale = 50
 
+  // Find largest image area for Z-ordering
+  let maxImageArea = 0
+  instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').array.forEach((aspectRatio, i) => {
+    // Approximate the area using aspect ratio (assuming normalized size of 1)
+    const width = Math.max(1, aspectRatio)
+    const height = Math.max(1, 1 / aspectRatio)
+    const area = width * height
+    maxImageArea = Math.max(maxImageArea, area)
+  })
+
   const matrix = new THREE.Matrix4()
   const instanceCount = instancedMeshRef.value.count
 
@@ -269,13 +413,46 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
 
     const coords = projectionMap.get(key.toLowerCase())
     if (coords) {
-      const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale
-      const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale
-      matrix.makeTranslation(scaledX + props.offsetX, scaledY, 0)
+      const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale * spreadFactor.value
+      const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale * spreadFactor.value
+
+      // Get the aspect ratio to calculate approximate area
+      const aspectRatio = instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').getX(i)
+      const width = Math.max(1, aspectRatio)
+      const height = Math.max(1, 1 / aspectRatio)
+      const area = width * height
+      const normalizedSize = area / maxImageArea
+      const zOffset = -normalizedSize * 0.3
+
+      matrix.makeTranslation(scaledX + props.offsetX, scaledY, zOffset)
       instancedMeshRef.value.setMatrixAt(i, matrix)
     }
   }
   instancedMeshRef.value.instanceMatrix.needsUpdate = true
+
+  // Apply force-directed repulsion if spread factor > 1
+  if (spreadFactor.value > 1.0) {
+    applyRepulsionForces(instancedMeshRef.value, 10)
+  }
+}
+
+function updateSpread() {
+  console.log('Updating spread factor:', spreadFactor.value)
+  if (currentProjectionData.value.length > 0) {
+    updateInstancePositions(currentProjectionData.value)
+  }
+}
+
+function initializeRendering() {
+  if (instancedMeshRef.value) {
+    // Force material to update all properties
+    instancedMeshRef.value.material.needsUpdate = true
+
+    // Force a single render frame
+    if (rendererRef.value && cameraRef.value && sceneRef.value) {
+      rendererRef.value.render(sceneRef.value, cameraRef.value)
+    }
+  }
 }
 
 // ----- Controls Setup -----
@@ -739,6 +916,7 @@ onMounted(async () => {
       '/data/atlas.png',
       async (texture) => {
         texture.flipY = false
+
         // If a current projection is set, try to fetch its data to build a projection map.
         let projectionMap: Map<string, { x: number, y: number }> | undefined
         if (imageStore.currentProjection) {
@@ -746,6 +924,7 @@ onMounted(async () => {
             const projResponse = await fetch(`/data/projections/${imageStore.currentProjection}`)
             if (projResponse.ok) {
               const projectionData = await projResponse.json()
+              currentProjectionData.value = projectionData
               projectionMap = new Map<string, { x: number, y: number }>()
               projectionData.forEach((item: { image: string, UMAP1: number, UMAP2: number }) => {
                 projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
@@ -759,10 +938,19 @@ onMounted(async () => {
             console.error('Error fetching projection data:', error)
           }
         }
+
         // Create the instanced mesh using the projection map if available.
         const instancedMesh = createInstancedMesh(texture, atlasData, projectionMap)
         instancedMeshRef.value = instancedMesh
         sceneRef.value.add(instancedMesh)
+
+        initializeRendering()
+
+        // Only update positions if we have projection data
+        if (currentProjectionData.value.length > 0) {
+          updateInstancePositions(currentProjectionData.value)
+        }
+
         // Start animation loop.
         animate()
       },
@@ -795,14 +983,14 @@ onMounted(async () => {
 watch(
   () => imageStore.currentProjection,
   async (newProjFile) => {
+    console.log('Current projection changed:', newProjFile)
     if (newProjFile) {
       try {
-        // pause here for 2 seconds
-        await new Promise(resolve => setTimeout(resolve, 4000))
         const response = await fetch(`/data/projections/${newProjFile}`)
         if (!response.ok)
           throw new Error('Failed to fetch projection data.')
         const projectionData = await response.json()
+        currentProjectionData.value = projectionData
         updateInstancePositions(projectionData)
         // Call animate() to ensure the scene updates.
         animate()
@@ -817,7 +1005,13 @@ watch(
 watch(backgroundColor, (color) => {
   sceneRef.value!.background = color
 })
-// filter updates
+
+// Watch for changes in spread factor and repulsion strength
+watch([spreadFactor, repulsionStrength], () => {
+  console.log('Spread or repulsion changed:', spreadFactor.value, repulsionStrength.value)
+  updateSpread()
+})
+
 // filter updates
 watch(() => imageStore.filteredImageIds, (filteredIds) => {
   const instanceCount = instancedMeshRef.value?.count
@@ -907,7 +1101,63 @@ defineExpose({
 </script>
 
 <template>
-  <canvas ref="canvas" />
+  <div class="relative h-full w-full">
+    <canvas ref="canvas" />
+
+    <!-- Controls panel -->
+    <div class="absolute right-6 top-6 z-10 w-64 rounded p-4 shadow-lg dark:bg-gray-800">
+      <h3 class="mb-2 text-sm font-medium">
+        Layout Controls
+      </h3>
+
+      <!-- Global spread slider -->
+      <div class="mb-4">
+        <div class="mb-1 flex items-center justify-between">
+          <span class="text-sm">Global Spread</span>
+        </div>
+        <v-slider
+          v-model="spreadFactor"
+          :min="1"
+          :max="3"
+          :step="0.1"
+          density="compact"
+          color="primary"
+          hide-details
+          thumb-label
+        />
+        <div class="mt-1 flex justify-between text-xs">
+          <span>Compact</span>
+          <span>Spread</span>
+        </div>
+      </div>
+
+      <!-- Repulsion strength slider -->
+      <div>
+        <div class="mb-1 flex items-center justify-between">
+          <span class="text-sm">Repulsion Force</span>
+        </div>
+        <v-slider
+          v-model="repulsionStrength"
+          :min="0"
+          :max="3"
+          :step="0.1"
+          density="compact"
+          color="secondary"
+          hide-details
+          thumb-label
+        />
+        <div class="mt-1 flex justify-between text-xs">
+          <span>Weak</span>
+          <span>Strong</span>
+        </div>
+      </div>
+
+      <div class="mt-3 text-xs">
+        <p>Use Global Spread to scale the whole visualization</p>
+        <p>Use Repulsion Force to avoid local overlapping</p>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>

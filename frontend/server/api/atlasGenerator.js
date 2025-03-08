@@ -336,4 +336,3 @@ export default defineEventHandler(async (event) => {
     return { success: false, error: error.message }
   }
 })
-```

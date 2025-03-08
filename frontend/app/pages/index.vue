@@ -354,18 +354,18 @@ onUnmounted(() => {
                         <li>
                           Example: <code>images.json</code> with content like:
                           <pre class="mt-2 overflow-x-auto rounded bg-gray-100 p-2">
-                          {
-                            "image1": {
-                              "type": "sample",
-                              "size": 10.5,
-                              "category": "A"
-                            },
-                            "image2": {
-                              "type": "control",
-                              "size": 8.3,
-                              "category": "B"
-                            }
-                          }</pre>
+{
+  "image1": {
+    "type": "sample",
+    "size": 10.5,
+    "category": "A"
+  },
+  "image2": {
+    "type": "control",
+    "size": 8.3,
+    "category": "B"
+  }
+}</pre>
                         </li>
                       </ol>
                     </div>
