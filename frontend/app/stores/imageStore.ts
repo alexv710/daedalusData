@@ -256,15 +256,20 @@ export const useImageStore = defineStore('image', () => {
 
           const value = img[attr]
 
-          // Handle missing values - exclude by default when filter is active
-          if (value === undefined || value === null)
-            return false
-
           if (filter.type === 'numeric') {
+          // Handle missing values for numeric filters - exclude by default
+            if (value === undefined || value === null)
+              return false
+
             // For numeric filters, check if value is within range
             return value >= filter.currentMin && value <= filter.currentMax
           }
           else if (filter.type === 'categorical') {
+          // For null/undefined values in categorical filters, check if 'null' is in the selected values
+            if (value === undefined || value === null) {
+              return filter.selected.includes('null')
+            }
+
             // For categorical filters, check if value is in selected values
             return filter.selected.includes(String(value))
           }
@@ -273,7 +278,7 @@ export const useImageStore = defineStore('image', () => {
         })
 
         if (passesAllFilters) {
-          // Convert image key to instance ID
+        // Convert image key to instance ID
           const instanceId = imageToInstanceMap.value.get(id)
           if (instanceId !== undefined) {
             newFilteredInstanceIds.add(instanceId)
