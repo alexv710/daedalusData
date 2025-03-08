@@ -2,7 +2,7 @@ name: Semantic Release
 
 on:
   push:
-    branches: [ main, develop, fb-dev-workflow ]
+    branches: [ main, dev, fb-dev-workflow ]
 
 jobs:
   release:

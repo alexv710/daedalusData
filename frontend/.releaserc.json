@@ -1,7 +1,7 @@
 {
   "branches": [
     "main",
-    {"name": "develop", "prerelease": true},
+    {"name": "dev", "prerelease": true},
     {"name": "fb-dev-workflow", "prerelease": true}
   ],
   "plugins": [

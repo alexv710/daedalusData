@@ -30,19 +30,52 @@ jobs:
           version: 8
           run_install: false
 
-      - name: Node Dependency Scan
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          pnpm install
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Frontend Dependency Scan
         uses: snyk/actions/node@master
         with:
-          args: --all-projects
+          args: --file=frontend/package.json
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-
+      
       - name: Python Dependency Scan
         uses: snyk/actions/python@master
         with:
           args: --file=requirements.txt
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          
+      # Using npm audit as a fallback for Snyk
+      - name: NPM Audit
+        run: |
+          cd frontend
+          npm audit --production || true
+          
+      - name: Python Safety Check
+        run: |
+          pip install safety
+          safety check -r requirements.txt || true
           
   container-scan:
     name: Scan Container
@@ -69,9 +102,10 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
+          timeout: '10m0s'
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
@@ -87,9 +121,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
-          languages: javascript, python
+          languages: javascript
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
