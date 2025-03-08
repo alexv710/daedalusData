@@ -507,9 +507,6 @@ export const useImageStore = defineStore('image', () => {
       'imageDetail',
       'width=800,height=800,resizable=yes,scrollbars=yes',
     )
-
-    // For debugging
-    console.log(`Opened detail window for image: ${imageId}`)
   }
 
   function closeDetailWindow() {

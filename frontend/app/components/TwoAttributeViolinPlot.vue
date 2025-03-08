@@ -195,7 +195,6 @@ function createBinnedData(data) {
 
 // Main chart drawing function
 function drawChart() {
-  console.log('Drawing chart')
   if (!chartContainer.value || !chart.value || !props.data
     || props.data.length === 0 || !selectedXAttribute.value || !selectedYAttribute.value) {
     showEmptyState()

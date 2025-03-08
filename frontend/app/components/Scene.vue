@@ -703,7 +703,6 @@ function updateHoveredMesh(
         || instanceToImageMap.value.get(lastHovered.index) !== imageStore.focusedId)) {
       const key = instanceToImageMap.value.get(lastHovered.index)
       if (!key || !imageStore.selectedIds.has(key)) {
-        console.log('Clearing previous hover highlight', lastHovered.index, key)
         setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
       }
       lastHovered.index = -1
@@ -748,7 +747,6 @@ function updateHoveredMesh(
           break
         }
         case 'right-click':
-          console.log('Right-click interaction detected')
           break
       }
     }
@@ -765,7 +763,6 @@ function resetFocus() {
     if (instanceId !== undefined) {
       // Only reset highlight if it's not in the selected set
       if (!imageStore.selectedIds.has(focusedId)) {
-        console.log('Clearing focused image highlight', instanceId, focusedId)
         setInstanceHighlight(instancedMeshRef.value, instanceId, 0)
       }
     }
@@ -781,7 +778,6 @@ function resetFocus() {
 
     // Only clear if it's not the same as the focused image we just cleared
     if (!isFocusedImage && (!key || !imageStore.selectedIds.has(key))) {
-      console.log('Clearing previous hover highlight', lastHovered.index, key)
       setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
     }
 

@@ -98,14 +98,12 @@ export const useLabelStore = defineStore('labels', () => {
 
   // --- Persistence Actions ---
   async function saveManifest() {
-    console.log('Saving manifest:', { alphabets: manifest.value })
     try {
       await fetch('/api/labels/manifest', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alphabets: manifest.value }),
       })
-      console.log('Manifest saved')
     }
     catch (error) {
       console.error('Error saving manifest:', error)
@@ -114,7 +112,6 @@ export const useLabelStore = defineStore('labels', () => {
 
   async function saveAlphabet(alphabet: LabelAlphabet, filename?: string) {
     const fileToSave = filename || `alphabet_${alphabet.id}.json`
-    console.log('Saving alphabet:', alphabet, 'to', fileToSave)
     try {
       await fetch(`/api/labels/${fileToSave}`, {
         method: 'PUT',
@@ -158,7 +155,6 @@ export const useLabelStore = defineStore('labels', () => {
       manifest.value = manifest.value.filter(f => f !== filename)
       // Update the manifest on the server.
       await saveManifest()
-      console.log(`Alphabet ${alphabetId} removed successfully.`)
     }
     catch (error: any) {
       console.error('Error removing alphabet:', error)
