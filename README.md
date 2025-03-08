@@ -36,7 +36,6 @@ DaedalusData/
 │   ├── features/     # Extracted features (CSV/NPZ)
 │   ├── projections/  # Dimensionality reduction results
 │   └── labels/       # Label alphabets and assignments
-└── backend/          # Supporting backend utilities
 ```
 
 ## Getting Started

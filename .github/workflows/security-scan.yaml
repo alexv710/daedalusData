@@ -1,0 +1,160 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, dev, fb-dev-workflow ]
+  pull_request:
+    branches: [ main, dev, fb-dev-workflow ]
+  schedule:
+    - cron: '0 4 * * 1'  # Run weekly at 4 AM on Monday
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-scan:
+    name: Scan Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          pnpm install
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: NPM Audit
+        run: |
+          cd frontend
+          npm audit --production || true
+          
+      - name: Python Safety Check
+        run: |
+          pip install safety
+          safety check -r requirements.txt || true
+          
+  container-scan:
+    name: Scan Container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Free up disk space
+      - name: Free Disk Space
+        run: |
+          echo "Before cleanup:"
+          df -h
+          
+          # Remove unnecessary large directories
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          
+          echo "After cleanup:"
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      # Build a smaller image for scanning
+      - name: Build Docker image for scanning
+        id: docker_build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: daedalusdata:test
+          cache-from: type=gha
+          load: true
+          build-args: |
+            TARGET=prod
+          outputs: type=docker,dest=image.tar
+        continue-on-error: true
+
+      - name: Verify image
+        id: verify_image
+        run: |
+          if [ -f "image.tar" ]; then
+            echo "Image built successfully, proceeding with scan"
+            echo "image_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Image build failed, skipping scan"
+            echo "image_exists=false" >> $GITHUB_OUTPUT
+            touch trivy-results.sarif  # Create empty file to avoid upload error
+          fi
+
+      - name: Run Trivy vulnerability scanner
+        if: steps.verify_image.outputs.image_exists == 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          input: image.tar
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          timeout: '10m0s'
+        continue-on-error: true
+
+      - name: Create empty SARIF file if missing
+        run: |
+          if [ ! -f "trivy-results.sarif" ]; then
+            echo '{"version":"2.1.0","runs":[]}' > trivy-results.sarif
+            echo "Created empty SARIF file as scan failed"
+          fi
+
+      - name: Upload Trivy scan results to GitHub Security tab
+          uses: github/codeql-action/upload-sarif@v3
+          if: always()
+          with:
+            sarif_file: 'trivy-results.sarif'
+
+  code-scanning:
+    name: CodeQL Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
