@@ -156,6 +156,13 @@ async function submitForm() {
   showForm.value = false
 }
 
+async function deleteForm() {
+  if (formType.value === 'Label') {
+    await labelStore.removeLabel(editingItem.value.alphabetId, editingItem.value.label.id)
+  }
+  showForm.value = false
+}
+
 function cancelForm() {
   showForm.value = false
 }
@@ -476,6 +483,9 @@ onMounted(async () => {
           />
         </v-card-text>
         <v-card-actions>
+          <v-btn variant="text" color="error" @click="deleteForm">
+            Delete
+          </v-btn>
           <v-spacer />
           <v-btn variant="text" color="primary" @click="submitForm">
             Save
