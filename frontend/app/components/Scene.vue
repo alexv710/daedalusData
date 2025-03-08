@@ -33,7 +33,7 @@ const instancedMeshRef = shallowRef<THREE.InstancedMesh | null>(null)
 const count = ref(0)
 const spreadFactor = ref(1.1)
 const imageSize = ref(1.0)
-const repulsionStrength = ref(1.0)
+const repulsionStrength = ref(0.1)
 const currentProjectionData = ref<any[]>([])
 const isControlsOpen = ref(true)
 
@@ -443,7 +443,6 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
 }
 
 function updateInstancePositions(projectionData: { image: string, UMAP1: number, UMAP2: number }[]) {
-  console.log('Updating instance positions with projection data and spread factor:', spreadFactor.value)
   if (!instancedMeshRef.value) {
     console.warn('No instanced mesh available to update.')
     return
@@ -532,8 +531,6 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
 }
 
 function updateSpread() {
-  console.log('Updating spread factor:', spreadFactor.value)
-
   // Store current image sizes before updating positions
   const tempScales = []
 
@@ -662,7 +659,6 @@ function updateHoveredMesh(
       console.warn('Scene is null, skipping lasso raycasting')
       return
     }
-    console.time('Lasso Total Time')
     const lassoPolygon = lassoShapePoints.value.map((pt) => {
       const projected = pt.clone().project(cameraRef.value!)
       return {
@@ -697,14 +693,6 @@ function updateHoveredMesh(
       imageStore.clearSelection()
     }
     imageStore.batchSelect(selectedKeys)
-    allMeshes.forEach((mesh) => {
-      for (let instanceId = 0; instanceId < mesh.count; instanceId++) {
-        const key = instanceToImageMap.value.get(instanceId)
-        const highlight = (key && imageStore.selectedIds.has(key)) ? 1 : 0
-        setInstanceHighlight(mesh, instanceId, highlight)
-      }
-    })
-    console.timeEnd('Lasso Total Time')
   }
   else {
     const hitResult = findHoveredInstance()
@@ -759,7 +747,6 @@ function updateHoveredMesh(
           break
         }
         case 'right-click':
-          console.log('Right-click interaction detected')
           break
       }
     }
@@ -767,15 +754,33 @@ function updateHoveredMesh(
 }
 
 function resetFocus() {
+  // Get the currently focused image ID first
+  const focusedId = imageStore.focusedId
+
+  // If there is a focused image, find and unhighlight it directly
+  if (focusedId && instancedMeshRef.value) {
+    const instanceId = imageToInstanceMap.value.get(focusedId)
+    if (instanceId !== undefined) {
+      // Only reset highlight if it's not in the selected set
+      if (!imageStore.selectedIds.has(focusedId)) {
+        setInstanceHighlight(instancedMeshRef.value, instanceId, 0)
+      }
+    }
+  }
+
   // Clear focus in the store
   imageStore.unlockImageFocus()
 
-  // Clear highlight on the previously focused instance
+  // Also clear highlight on the previously hovered instance if different from focused
   if (lastHovered.index !== -1 && lastHovered.mesh) {
     const key = instanceToImageMap.value.get(lastHovered.index)
-    if (!key || !imageStore.selectedIds.has(key)) {
+    const isFocusedImage = key === focusedId
+
+    // Only clear if it's not the same as the focused image we just cleared
+    if (!isFocusedImage && (!key || !imageStore.selectedIds.has(key))) {
       setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
     }
+
     lastHovered.index = -1
     lastHovered.mesh = null
   }
@@ -879,24 +884,25 @@ function handleMouseUp(event: MouseEvent) {
         // If ctrl is pressed, handle selection toggling
         if (event.ctrlKey) {
           imageStore.toggleSelection(key)
-          if (hitResult.mesh) {
-            setInstanceHighlight(
-              hitResult.mesh,
-              hitResult.instanceId,
-              imageStore.selectedIds.has(key) ? 1 : 0,
-            )
-          }
         }
         else {
+          // If another image is already locked, reset focus first
+          if (imageStore.isImageFocusLocked && imageStore.focusedId !== key) {
+            resetFocus()
+          }
+
           // Lock focus on clicked image
           imageStore.lockImageFocus(key)
 
-          if (hitResult.mesh) {
-            setInstanceHighlight(hitResult.mesh, hitResult.instanceId, 1)
-          }
-
           // Emit the focused image key for display
           emit('imageFocusChange', key)
+
+          // Make sure the clicked image is highlighted
+          setInstanceHighlight(hitResult.mesh, hitResult.instanceId, 1)
+
+          // Update lastHovered to the new focused image
+          lastHovered.index = hitResult.instanceId
+          lastHovered.mesh = hitResult.mesh
 
           // Open detail window if not already open
           if (!imageStore.isDetailWindowOpen()) {
@@ -1121,7 +1127,6 @@ onMounted(async () => {
 watch(
   () => imageStore.currentProjection,
   async (newProjFile) => {
-    console.log('Current projection changed:', newProjFile)
     if (newProjFile) {
       try {
         const response = await fetch(`/data/projections/${newProjFile}`)
@@ -1145,16 +1150,10 @@ watch(backgroundColor, (color) => {
 })
 
 watch([spreadFactor, repulsionStrength], () => {
-  console.log('Layout parameters changed:', {
-    spreadFactor: spreadFactor.value,
-    repulsionStrength: repulsionStrength.value,
-  })
   updateSpread()
 })
 
 watch(imageSize, () => {
-  console.log('Image size changed:', imageSize.value)
-
   updateImageSizeUniform()
   updateInstanceSizes()
 })
@@ -1260,13 +1259,13 @@ defineExpose({
     >
       <!-- Toggle button -->
       <button
-        class="absolute top-2 h-6 w-6 flex items-center justify-center rounded-full bg-gray-200 text-gray-700 shadow-md -left-3 dark:bg-gray-700 hover:bg-gray-300 dark:text-gray-200 dark:hover:bg-gray-600"
+        class="absolute top-2 h-8 w-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-700 shadow-md -left-6 dark:bg-gray-700 hover:bg-gray-300 dark:text-gray-200 dark:hover:bg-gray-600"
         :title="isControlsOpen ? 'Collapse controls' : 'Expand controls'"
         @click="isControlsOpen = !isControlsOpen"
       >
         <v-icon
           :icon="isControlsOpen ? 'mdi-chevron-right' : 'mdi-chevron-left'"
-          size="small"
+          size="large"
         />
       </button>
 
@@ -1316,6 +1315,7 @@ defineExpose({
             <span>Weak</span>
             <span>Strong</span>
           </div>
+          <v-divider class="my-2" />
         </div>
 
         <!-- Image Size slider -->
@@ -1340,9 +1340,9 @@ defineExpose({
         </div>
 
         <div class="mt-3 text-xs">
-          <p>Use Global Spread to scale the whole visualization</p>
-          <p>Use Repulsion Force to avoid local overlapping</p>
-          <p>Adjust Image Size to control detail visibility</p>
+            <p><strong>- Global Spread</strong> to scale all images</p>
+            <p><strong>- Repulsion Force</strong> for local overplotting</p>
+            <p><strong>- Image Size</strong> to control detail visibility</p>
         </div>
       </div>
 
