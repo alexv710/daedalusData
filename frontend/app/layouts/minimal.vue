@@ -134,9 +134,6 @@ function getDisplayName() {
         <v-btn variant="text" class="text-sm" to="/analysis">
           Analysis
         </v-btn>
-        <v-btn variant="text" class="text-sm" to="/test">
-          Test
-        </v-btn>
         <DarkToggle class="mr-4" />
         <v-app-bar-nav-icon variant="text" @click.stop="drawerRight = !drawerRight" />
       </v-app-bar>
