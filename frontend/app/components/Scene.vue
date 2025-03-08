@@ -443,7 +443,6 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
 }
 
 function updateInstancePositions(projectionData: { image: string, UMAP1: number, UMAP2: number }[]) {
-  console.log('Updating instance positions with projection data and spread factor:', spreadFactor.value)
   if (!instancedMeshRef.value) {
     console.warn('No instanced mesh available to update.')
     return
@@ -532,8 +531,6 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
 }
 
 function updateSpread() {
-  console.log('Updating spread factor:', spreadFactor.value)
-
   // Store current image sizes before updating positions
   const tempScales = []
 
@@ -662,7 +659,6 @@ function updateHoveredMesh(
       console.warn('Scene is null, skipping lasso raycasting')
       return
     }
-    console.time('Lasso Total Time')
     const lassoPolygon = lassoShapePoints.value.map((pt) => {
       const projected = pt.clone().project(cameraRef.value!)
       return {
@@ -697,14 +693,6 @@ function updateHoveredMesh(
       imageStore.clearSelection()
     }
     imageStore.batchSelect(selectedKeys)
-    allMeshes.forEach((mesh) => {
-      for (let instanceId = 0; instanceId < mesh.count; instanceId++) {
-        const key = instanceToImageMap.value.get(instanceId)
-        const highlight = (key && imageStore.selectedIds.has(key)) ? 1 : 0
-        setInstanceHighlight(mesh, instanceId, highlight)
-      }
-    })
-    console.timeEnd('Lasso Total Time')
   }
   else {
     const hitResult = findHoveredInstance()
@@ -715,6 +703,7 @@ function updateHoveredMesh(
         || instanceToImageMap.value.get(lastHovered.index) !== imageStore.focusedId)) {
       const key = instanceToImageMap.value.get(lastHovered.index)
       if (!key || !imageStore.selectedIds.has(key)) {
+        console.log('Clearing previous hover highlight', lastHovered.index, key)
         setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
       }
       lastHovered.index = -1
@@ -767,15 +756,35 @@ function updateHoveredMesh(
 }
 
 function resetFocus() {
+  // Get the currently focused image ID first
+  const focusedId = imageStore.focusedId
+
+  // If there is a focused image, find and unhighlight it directly
+  if (focusedId && instancedMeshRef.value) {
+    const instanceId = imageToInstanceMap.value.get(focusedId)
+    if (instanceId !== undefined) {
+      // Only reset highlight if it's not in the selected set
+      if (!imageStore.selectedIds.has(focusedId)) {
+        console.log('Clearing focused image highlight', instanceId, focusedId)
+        setInstanceHighlight(instancedMeshRef.value, instanceId, 0)
+      }
+    }
+  }
+
   // Clear focus in the store
   imageStore.unlockImageFocus()
 
-  // Clear highlight on the previously focused instance
+  // Also clear highlight on the previously hovered instance if different from focused
   if (lastHovered.index !== -1 && lastHovered.mesh) {
     const key = instanceToImageMap.value.get(lastHovered.index)
-    if (!key || !imageStore.selectedIds.has(key)) {
+    const isFocusedImage = key === focusedId
+
+    // Only clear if it's not the same as the focused image we just cleared
+    if (!isFocusedImage && (!key || !imageStore.selectedIds.has(key))) {
+      console.log('Clearing previous hover highlight', lastHovered.index, key)
       setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
     }
+
     lastHovered.index = -1
     lastHovered.mesh = null
   }
@@ -879,24 +888,25 @@ function handleMouseUp(event: MouseEvent) {
         // If ctrl is pressed, handle selection toggling
         if (event.ctrlKey) {
           imageStore.toggleSelection(key)
-          if (hitResult.mesh) {
-            setInstanceHighlight(
-              hitResult.mesh,
-              hitResult.instanceId,
-              imageStore.selectedIds.has(key) ? 1 : 0,
-            )
-          }
         }
         else {
+          // If another image is already locked, reset focus first
+          if (imageStore.isImageFocusLocked && imageStore.focusedId !== key) {
+            resetFocus()
+          }
+
           // Lock focus on clicked image
           imageStore.lockImageFocus(key)
 
-          if (hitResult.mesh) {
-            setInstanceHighlight(hitResult.mesh, hitResult.instanceId, 1)
-          }
-
           // Emit the focused image key for display
           emit('imageFocusChange', key)
+
+          // Make sure the clicked image is highlighted
+          setInstanceHighlight(hitResult.mesh, hitResult.instanceId, 1)
+
+          // Update lastHovered to the new focused image
+          lastHovered.index = hitResult.instanceId
+          lastHovered.mesh = hitResult.mesh
 
           // Open detail window if not already open
           if (!imageStore.isDetailWindowOpen()) {
@@ -1121,7 +1131,6 @@ onMounted(async () => {
 watch(
   () => imageStore.currentProjection,
   async (newProjFile) => {
-    console.log('Current projection changed:', newProjFile)
     if (newProjFile) {
       try {
         const response = await fetch(`/data/projections/${newProjFile}`)
@@ -1145,16 +1154,10 @@ watch(backgroundColor, (color) => {
 })
 
 watch([spreadFactor, repulsionStrength], () => {
-  console.log('Layout parameters changed:', {
-    spreadFactor: spreadFactor.value,
-    repulsionStrength: repulsionStrength.value,
-  })
   updateSpread()
 })
 
 watch(imageSize, () => {
-  console.log('Image size changed:', imageSize.value)
-
   updateImageSizeUniform()
   updateInstanceSizes()
 })
