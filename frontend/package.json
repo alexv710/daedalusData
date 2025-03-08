@@ -10,6 +10,8 @@
     "start": "node .output/server/index.mjs",
     "start:generate": "npx serve .output/public",
     "lint": "eslint .",
+    "lint:ci": "eslint --ignore-pattern '.nuxt/**' .",
+    "lint:fix": "eslint --fix .",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest",
     "test:ci": "vitest run --coverage",

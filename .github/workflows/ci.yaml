@@ -54,10 +54,17 @@ jobs:
           cd frontend
           pnpm install
 
+      - name: Build Nuxt for ESLint config
+        run: |
+          cd frontend
+          pnpm run dev &
+          sleep 15
+          pkill -f "pnpm run dev" || true
+
       - name: Lint JavaScript/TypeScript
         run: |
           cd frontend
-          pnpm lint || true
+          pnpm lint:ci || true
 
       - name: Check commit message format
         uses: wagoid/commitlint-github-action@v5
