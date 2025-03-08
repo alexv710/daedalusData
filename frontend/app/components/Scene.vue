@@ -474,7 +474,7 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
 
   // Find largest image area for Z-ordering
   let maxImageArea = 0
-  instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').array.forEach((aspectRatio, i) => {
+  instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').array.forEach((aspectRatio: number) => {
     // Approximate the area using aspect ratio (assuming normalized size of 1)
     const width = Math.max(1, aspectRatio)
     const height = Math.max(1, 1 / aspectRatio)
@@ -1340,9 +1340,9 @@ defineExpose({
         </div>
 
         <div class="mt-3 text-xs">
-            <p><strong>- Global Spread</strong> to scale all images</p>
-            <p><strong>- Repulsion Force</strong> for local overplotting</p>
-            <p><strong>- Image Size</strong> to control detail visibility</p>
+          <p><strong>- Global Spread</strong> to scale all images</p>
+          <p><strong>- Repulsion Force</strong> for local overplotting</p>
+          <p><strong>- Image Size</strong> to control detail visibility</p>
         </div>
       </div>
 
