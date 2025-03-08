@@ -31,9 +31,11 @@ const rendererRef = ref<THREE.WebGLRenderer | null>(null)
 const sceneRef = shallowRef<THREE.Scene | null>(null)
 const instancedMeshRef = shallowRef<THREE.InstancedMesh | null>(null)
 const count = ref(0)
-const spreadFactor = ref(1.0)
+const spreadFactor = ref(1.1)
+const imageSize = ref(1.0)
 const repulsionStrength = ref(1.0)
 const currentProjectionData = ref<any[]>([])
+const isControlsOpen = ref(true)
 
 // ----- Raycasting & Lasso Handling -----
 const raycaster = new THREE.Raycaster()
@@ -81,6 +83,7 @@ attribute float instanceAspectRatio;
 attribute vec3 instancePosition;
 attribute vec4 instanceBorderColor;
 attribute float instanceGrayedOut;
+uniform float imageSizeFactor;
 varying vec2 vUV;
 varying float vHighlight;
 varying vec2 vDimensions;
@@ -240,6 +243,7 @@ function createInstancedMesh(
       map: { value: atlasTexture },
       highlightColor: { value: new THREE.Color(0x0F08C9) },
       highlightIntensity: { value: 0.5 },
+      imageSizeFactor: { value: imageSize.value },
     },
     vertexShader,
     fragmentShader,
@@ -254,7 +258,18 @@ function createInstancedMesh(
     const x = instancePositions[i * 3]
     const y = instancePositions[i * 3 + 1]
     const z = instancePositions[i * 3 + 2]
-    matrix.makeTranslation(x, y, z)
+
+    // Incorporate image size in the matrix
+    const aspectRatio = instanceAspectRatios[i]
+    const width = Math.max(1, aspectRatio) * imageSize.value
+    const height = Math.max(1, 1 / aspectRatio) * imageSize.value
+
+    matrix.compose(
+      new THREE.Vector3(x, y, z),
+      new THREE.Quaternion(),
+      new THREE.Vector3(width, height, 1),
+    )
+
     instancedMesh.setMatrixAt(i, matrix)
   }
   instancedMesh.instanceMatrix.needsUpdate = true
@@ -265,6 +280,58 @@ function createInstancedMesh(
   }
 
   return instancedMesh
+}
+
+function updateImageSizeUniform() {
+  if (instancedMeshRef.value && instancedMeshRef.value.material) {
+    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value
+  }
+}
+
+function updateInstanceSizes() {
+  if (!instancedMeshRef.value)
+    return
+
+  const tempMatrix = new THREE.Matrix4()
+  const tempPosition = new THREE.Vector3()
+  const tempRotation = new THREE.Quaternion()
+  const tempScale = new THREE.Vector3()
+
+  for (let i = 0; i < instancedMeshRef.value.count; i++) {
+    // Get current matrix
+    instancedMeshRef.value.getMatrixAt(i, tempMatrix)
+
+    // Decompose to get position and rotation
+    tempMatrix.decompose(tempPosition, tempRotation, tempScale)
+
+    // Calculate new scale based on aspect ratio
+    const aspectRatio = instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').getX(i)
+    const width = Math.max(1, aspectRatio) * imageSize.value
+    const height = Math.max(1, 1 / aspectRatio) * imageSize.value
+
+    // Create new matrix with updated scale
+    tempMatrix.compose(
+      tempPosition,
+      tempRotation,
+      new THREE.Vector3(width, height, 1),
+    )
+
+    // Set the updated matrix
+    instancedMeshRef.value.setMatrixAt(i, tempMatrix)
+  }
+
+  // Update the shader uniform
+  if (instancedMeshRef.value.material) {
+    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value
+  }
+
+  // Mark instance matrix as needing update
+  instancedMeshRef.value.instanceMatrix.needsUpdate = true
+
+  // Apply repulsion forces to avoid overlapping after size change
+  if (spreadFactor.value > 1.0 && repulsionStrength.value > 0) {
+    applyRepulsionForces(instancedMeshRef.value, 10)
+  }
 }
 
 /**
@@ -281,16 +348,18 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
   const zValues = []
   const tempMatrix = new THREE.Matrix4()
   const tempPosition = new THREE.Vector3()
+  const tempRotation = new THREE.Quaternion()
+  const tempScale = new THREE.Vector3()
   const repFactor = (spreadFactor.value - 1) * repulsionStrength.value
 
   // If spread factor is 1 or below, no repulsion needed
   if (repFactor <= 0)
     return
 
-  // Extract current positions
+  // Extract current positions and scales
   for (let i = 0; i < instanceCount; i++) {
     mesh.getMatrixAt(i, tempMatrix)
-    tempPosition.setFromMatrixPosition(tempMatrix)
+    tempMatrix.decompose(tempPosition, tempRotation, tempScale)
     positions.push({ x: tempPosition.x, y: tempPosition.y })
     zValues.push(tempPosition.z)
   }
@@ -300,8 +369,8 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
   const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
   for (let i = 0; i < instanceCount; i++) {
     const aspectRatio = aspectRatios.getX(i)
-    const width = Math.max(1, aspectRatio)
-    const height = Math.max(1, 1 / aspectRatio)
+    const width = Math.max(1, aspectRatio) * imageSize.value
+    const height = Math.max(1, 1 / aspectRatio) * imageSize.value
     sizes.push({ width, height })
   }
 
@@ -317,14 +386,21 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
 
         const posI = positions[i]
         const posJ = positions[j]
+        const sizeI = sizes[i]
+        const sizeJ = sizes[j]
 
         // Calculate distance between centers
         const dx = posJ.x - posI.x
         const dy = posJ.y - posI.y
         const distanceSquared = dx * dx + dy * dy
 
+        // Calculate combined bounding box size
+        const combinedWidth = (sizeI.width + sizeJ.width) / 2
+        const combinedHeight = (sizeI.height + sizeJ.height) / 2
+
         // Skip if too far apart (optimization)
-        if (distanceSquared > 25)
+        const maxDistanceToCheck = combinedWidth + combinedHeight
+        if (distanceSquared > maxDistanceToCheck * maxDistanceToCheck * 2)
           continue
 
         // Avoid division by zero
@@ -351,11 +427,15 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
 
   // Apply updated positions back to the mesh
   for (let i = 0; i < instanceCount; i++) {
-    tempMatrix.makeTranslation(
-      positions[i].x,
-      positions[i].y,
-      zValues[i],
+    mesh.getMatrixAt(i, tempMatrix)
+    tempMatrix.decompose(tempPosition, tempRotation, tempScale)
+
+    tempMatrix.compose(
+      new THREE.Vector3(positions[i].x, positions[i].y, zValues[i]),
+      tempRotation,
+      tempScale,
     )
+
     mesh.setMatrixAt(i, tempMatrix)
   }
 
@@ -404,12 +484,19 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
   })
 
   const matrix = new THREE.Matrix4()
+  const tempPosition = new THREE.Vector3()
+  const tempRotation = new THREE.Quaternion()
+  const tempScale = new THREE.Vector3()
   const instanceCount = instancedMeshRef.value.count
 
   for (let i = 0; i < instanceCount; i++) {
     const key = instanceToImageMap.value.get(i)
     if (!key)
       continue
+
+    // Preserve the current scale by reading it from the existing matrix
+    instancedMeshRef.value.getMatrixAt(i, matrix)
+    matrix.decompose(tempPosition, tempRotation, tempScale)
 
     const coords = projectionMap.get(key.toLowerCase())
     if (coords) {
@@ -418,13 +505,21 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
 
       // Get the aspect ratio to calculate approximate area
       const aspectRatio = instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').getX(i)
+
+      // For Z-ordering
       const width = Math.max(1, aspectRatio)
       const height = Math.max(1, 1 / aspectRatio)
       const area = width * height
       const normalizedSize = area / maxImageArea
       const zOffset = -normalizedSize * 0.3
 
-      matrix.makeTranslation(scaledX + props.offsetX, scaledY, zOffset)
+      // Use the existing scale values from tempScale instead of calculating new ones
+      matrix.compose(
+        new THREE.Vector3(scaledX + props.offsetX, scaledY, zOffset),
+        tempRotation,
+        tempScale,
+      )
+
       instancedMeshRef.value.setMatrixAt(i, matrix)
     }
   }
@@ -438,8 +533,51 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
 
 function updateSpread() {
   console.log('Updating spread factor:', spreadFactor.value)
+
+  // Store current image sizes before updating positions
+  const tempScales = []
+
+  if (instancedMeshRef.value) {
+    const matrix = new THREE.Matrix4()
+    const tempPosition = new THREE.Vector3()
+    const tempRotation = new THREE.Quaternion()
+    const tempScale = new THREE.Vector3()
+
+    // Store all current scales
+    for (let i = 0; i < instancedMeshRef.value.count; i++) {
+      instancedMeshRef.value.getMatrixAt(i, matrix)
+      matrix.decompose(tempPosition, tempRotation, tempScale)
+      tempScales.push(tempScale.clone())
+    }
+  }
+
+  // Update positions
   if (currentProjectionData.value.length > 0) {
     updateInstancePositions(currentProjectionData.value)
+  }
+
+  // Restore scales if needed
+  if (instancedMeshRef.value && tempScales.length === instancedMeshRef.value.count) {
+    const matrix = new THREE.Matrix4()
+    const tempPosition = new THREE.Vector3()
+    const tempRotation = new THREE.Quaternion()
+    const tempScale = new THREE.Vector3()
+
+    for (let i = 0; i < instancedMeshRef.value.count; i++) {
+      instancedMeshRef.value.getMatrixAt(i, matrix)
+      matrix.decompose(tempPosition, tempRotation, tempScale)
+
+      // Create new matrix with original position but preserved scale
+      matrix.compose(
+        tempPosition,
+        tempRotation,
+        tempScales[i],
+      )
+
+      instancedMeshRef.value.setMatrixAt(i, matrix)
+    }
+
+    instancedMeshRef.value.instanceMatrix.needsUpdate = true
   }
 }
 
@@ -473,7 +611,7 @@ function setupControls(camera: THREE.Camera, rendererElement: HTMLElement): Arcb
   controls.cursorZoom = true
   controls.enableRotate = false
   controls.minDistance = 1
-  controls.maxDistance = 100
+  controls.maxDistance = 1000
   controls.enablePan = true
   controls.panSpeed = 0.5
   controls.setGizmosVisible(false)
@@ -885,7 +1023,7 @@ onMounted(async () => {
   }
   sceneRef.value = new THREE.Scene()
   sceneRef.value.background = backgroundColor.value
-  const camera = new THREE.PerspectiveCamera(75, props.width / props.height, 0.1, 1000)
+  const camera = new THREE.PerspectiveCamera(75, props.width / props.height, 0.1, 10000)
   camera.position.z = 50
   cameraRef.value = camera
   const renderer = new THREE.WebGLRenderer({ canvas: canvas.value, antialias: true })
@@ -1006,10 +1144,19 @@ watch(backgroundColor, (color) => {
   sceneRef.value!.background = color
 })
 
-// Watch for changes in spread factor and repulsion strength
 watch([spreadFactor, repulsionStrength], () => {
-  console.log('Spread or repulsion changed:', spreadFactor.value, repulsionStrength.value)
+  console.log('Layout parameters changed:', {
+    spreadFactor: spreadFactor.value,
+    repulsionStrength: repulsionStrength.value,
+  })
   updateSpread()
+})
+
+watch(imageSize, () => {
+  console.log('Image size changed:', imageSize.value)
+
+  updateImageSizeUniform()
+  updateInstanceSizes()
 })
 
 // filter updates
@@ -1104,57 +1251,111 @@ defineExpose({
   <div class="relative h-full w-full">
     <canvas ref="canvas" />
 
-    <!-- Controls panel -->
-    <div class="absolute right-6 top-6 z-10 w-64 rounded p-4 shadow-lg dark:bg-gray-800">
-      <h3 class="mb-2 text-sm font-medium">
-        Layout Controls
-      </h3>
-
-      <!-- Global spread slider -->
-      <div class="mb-4">
-        <div class="mb-1 flex items-center justify-between">
-          <span class="text-sm">Global Spread</span>
-        </div>
-        <v-slider
-          v-model="spreadFactor"
-          :min="1"
-          :max="3"
-          :step="0.1"
-          density="compact"
-          color="primary"
-          hide-details
-          thumb-label
+    <!-- Collapsible Controls panel -->
+    <div
+      class="absolute right-6 top-6 z-10 rounded bg-gray-100 shadow-lg transition-all duration-300 dark:bg-gray-800"
+      :class="[
+        isControlsOpen ? 'w-64 p-4' : 'w-10 p-2',
+      ]"
+    >
+      <!-- Toggle button -->
+      <button
+        class="absolute top-2 h-6 w-6 flex items-center justify-center rounded-full bg-gray-200 text-gray-700 shadow-md -left-3 dark:bg-gray-700 hover:bg-gray-300 dark:text-gray-200 dark:hover:bg-gray-600"
+        :title="isControlsOpen ? 'Collapse controls' : 'Expand controls'"
+        @click="isControlsOpen = !isControlsOpen"
+      >
+        <v-icon
+          :icon="isControlsOpen ? 'mdi-chevron-right' : 'mdi-chevron-left'"
+          size="small"
         />
-        <div class="mt-1 flex justify-between text-xs">
-          <span>Compact</span>
-          <span>Spread</span>
+      </button>
+
+      <!-- Panel content - shown when open -->
+      <div v-if="isControlsOpen">
+        <h3 class="mb-2 text-sm font-medium">
+          Layout Controls
+        </h3>
+
+        <!-- Global spread slider -->
+        <div class="mb-4">
+          <div class="mb-1 flex items-center justify-between">
+            <span class="text-sm">Global Spread</span>
+          </div>
+          <v-slider
+            v-model="spreadFactor"
+            :min="1"
+            :max="6"
+            :step="0.1"
+            density="compact"
+            color="primary"
+            hide-details
+            thumb-label
+          />
+          <div class="mt-1 flex justify-between text-xs">
+            <span>Compact</span>
+            <span>Spread</span>
+          </div>
+        </div>
+
+        <!-- Repulsion strength slider -->
+        <div>
+          <div class="mb-1 flex items-center justify-between">
+            <span class="text-sm">Repulsion Force</span>
+          </div>
+          <v-slider
+            v-model="repulsionStrength"
+            :min="0"
+            :max="6"
+            :step="0.1"
+            density="compact"
+            color="secondary"
+            hide-details
+            thumb-label
+          />
+          <div class="mt-1 flex justify-between text-xs">
+            <span>Weak</span>
+            <span>Strong</span>
+          </div>
+        </div>
+
+        <!-- Image Size slider -->
+        <div class="mb-4">
+          <div class="mb-1 flex items-center justify-between">
+            <span class="text-sm">Image Size</span>
+          </div>
+          <v-slider
+            v-model="imageSize"
+            :min="0.5"
+            :max="6"
+            :step="0.1"
+            density="compact"
+            color="success"
+            hide-details
+            thumb-label
+          />
+          <div class="mt-1 flex justify-between text-xs">
+            <span>Small</span>
+            <span>Large</span>
+          </div>
+        </div>
+
+        <div class="mt-3 text-xs">
+          <p>Use Global Spread to scale the whole visualization</p>
+          <p>Use Repulsion Force to avoid local overlapping</p>
+          <p>Adjust Image Size to control detail visibility</p>
         </div>
       </div>
 
-      <!-- Repulsion strength slider -->
-      <div>
-        <div class="mb-1 flex items-center justify-between">
-          <span class="text-sm">Repulsion Force</span>
+      <!-- Collapsed state - vertical text -->
+      <div
+        v-else
+        class="h-full w-full flex flex-col cursor-pointer items-center justify-center"
+        title="Click to expand controls"
+        @click="isControlsOpen = true"
+      >
+        <div class="vertical-text text-xs font-medium">
+          Controls
         </div>
-        <v-slider
-          v-model="repulsionStrength"
-          :min="0"
-          :max="3"
-          :step="0.1"
-          density="compact"
-          color="secondary"
-          hide-details
-          thumb-label
-        />
-        <div class="mt-1 flex justify-between text-xs">
-          <span>Weak</span>
-          <span>Strong</span>
-        </div>
-      </div>
-
-      <div class="mt-3 text-xs">
-        <p>Use Global Spread to scale the whole visualization</p>
-        <p>Use Repulsion Force to avoid local overlapping</p>
       </div>
     </div>
   </div>
@@ -1165,5 +1366,11 @@ canvas {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.vertical-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
 }
 </style>
