@@ -2,6 +2,10 @@
   "name": "daedalusdata-root",
   "private": true,
   "version": "0.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexv710/daedalusData.git"
+  },
   "scripts": {
     "prepare": "husky install"
   },

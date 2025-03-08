@@ -2,7 +2,7 @@ name: Semantic Release
 
 on:
   push:
-    branches: [ main, fb-dev-workflow ]
+    branches: [ main, develop, fb-dev-workflow ]
 
 jobs:
   release:
@@ -13,11 +13,12 @@ jobs:
       issues: write
       pull-requests: write
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -49,12 +50,26 @@ jobs:
           pnpm install
           pnpm add -D semantic-release @semantic-release/changelog @semantic-release/git conventional-changelog-conventionalcommits
 
+      - name: Display repository info
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Workspace: ${{ github.workspace }}"
+          git remote -v
+
+      - name: Verify .releaserc.json exists
+        run: |
+          cd frontend
+          ls -la .releaserc.json
+          cat .releaserc.json
+
       - name: Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd frontend
-          npx semantic-release
+          npx semantic-release --debug
 
       - name: Docker Build and Push
         uses: docker/build-push-action@v5

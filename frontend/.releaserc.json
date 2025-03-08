@@ -1,14 +1,18 @@
 {
-  "branches": ["main", { "name": "fb-dev-workflow", "prerelease": true }],
+  "branches": [
+    "main",
+    {"name": "develop", "prerelease": true},
+    {"name": "fb-dev-workflow", "prerelease": true}
+  ],
   "plugins": [
     ["@semantic-release/commit-analyzer", {
       "preset": "conventionalcommits",
       "releaseRules": [
-        { "type": "docs", "scope": "README", "release": "patch" },
-        { "type": "refactor", "release": "patch" },
-        { "type": "style", "release": "patch" },
-        { "type": "chore", "release": "patch" },
-        { "type": "perf", "release": "patch" }
+        {"type": "docs", "scope": "README", "release": "patch"},
+        {"type": "refactor", "release": "patch"},
+        {"type": "style", "release": "patch"},
+        {"type": "chore", "release": "patch"},
+        {"type": "perf", "release": "patch"}
       ],
       "parserOpts": {
         "noteKeywords": ["BREAKING CHANGE", "BREAKING CHANGES"]
