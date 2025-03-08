@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-// server/routes/files/[type].get.ts
 import { defineEventHandler } from 'h3'
 
 async function getFileStats(dirPath: string) {
@@ -26,8 +25,11 @@ async function getFileStats(dirPath: string) {
 export default defineEventHandler(async (event) => {
   const type = event.context.params?.type
 
-  if (!type || !['images', 'metadata'].includes(type)) {
-    return { error: 'Invalid file type requested' }
+  // Expanded list of valid file types
+  const validTypes = ['images', 'metadata', 'features', 'projections']
+
+  if (!type || !validTypes.includes(type)) {
+    return { error: 'Invalid file type requested', validTypes }
   }
 
   try {
@@ -35,22 +37,50 @@ export default defineEventHandler(async (event) => {
     const dirPath = path.join('/app/data', type)
     console.log('Attempting to read directory:', dirPath)
 
+    // Make sure the directory exists, if not create it
+    try {
+      await fs.access(dirPath)
+    }
+    catch (error) {
+      console.log(`Creating directory ${dirPath} as it doesn't exist yet`)
+      await fs.mkdir(dirPath, { recursive: true })
+    }
+
     const files = await getFileStats(dirPath)
     console.log(`Found ${files.length} files in ${type}`)
 
-    // For images, only return supported formats
+    // Filter files based on type
+    let filteredFiles = files
+
     if (type === 'images') {
-      const imageFiles = files.filter(f =>
+      // For images, only return supported formats
+      filteredFiles = files.filter(f =>
         f.name.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/))
-      return { files: imageFiles }
+    }
+    else if (type === 'metadata') {
+      // For metadata, only return json files
+      filteredFiles = files.filter(f =>
+        f.name.toLowerCase().endsWith('.json'))
+    }
+    else if (type === 'features') {
+      // For features, return csv, json, and npz files
+      filteredFiles = files.filter(f =>
+        f.name.toLowerCase().match(/\.(csv|json|npz)$/))
+    }
+    else if (type === 'projections') {
+      // For projections, return json files
+      filteredFiles = files.filter(f =>
+        f.name.toLowerCase().endsWith('.json'))
     }
 
-    // For metadata, only return json files
-    if (type === 'metadata') {
-      const metaFiles = files.filter(f =>
-        f.name.toLowerCase().endsWith('.json'))
-      return { files: metaFiles }
-    }
+    // Sort files by last modified (newest first) to show the most recent ones at the top
+    filteredFiles.sort((a, b) => {
+      const dateA = new Date(a.lastModified).getTime()
+      const dateB = new Date(b.lastModified).getTime()
+      return dateB - dateA
+    })
+
+    return { files: filteredFiles }
   }
   catch (error) {
     console.error(`Error reading ${type} directory:`, error)
