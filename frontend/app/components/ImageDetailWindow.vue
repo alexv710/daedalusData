@@ -84,7 +84,7 @@ function formatValue(value) {
 
     <div v-if="imageData" class="content">
       <div class="image-container">
-        <img :src="`/data/images/${imageId}.png`" :alt="imageId">
+        <img :src="`/data/images/${imageId}`" :alt="imageId">
       </div>
 
       <div class="metadata">
