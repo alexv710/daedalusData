@@ -4,4 +4,4 @@
 # Change to frontend directory and run checks
 cd frontend
 pnpm lint
-pnpm test:ci -- --run || true
+pnpm test:ci -- --run

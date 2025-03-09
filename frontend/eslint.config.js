@@ -23,4 +23,13 @@ export default nuxt(
     },
   },
   ),
+  {
+    ignores: [
+      'node_modules/',
+      '.nuxt/',
+      'dist/',
+      '.output/',
+      '.pnpm-store/',
+    ],
+  },
 )

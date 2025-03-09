@@ -2,8 +2,7 @@
   "branches": [
     "+([0-9])?(.{+([0-9]),x}).x",
     "main",
-    { "name": "dev", "prerelease": true },
-    { "name": "fb-dev-workflow", "prerelease": true }
+    { "name": "dev", "prerelease": true }
   ],
   "plugins": [
     ["@semantic-release/commit-analyzer", {

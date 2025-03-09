@@ -2,9 +2,9 @@ name: Security Scan
 
 on:
   push:
-    branches: [ main, dev, fb-dev-workflow ]
+    branches: [ main, dev ]
   pull_request:
-    branches: [ main, dev, fb-dev-workflow ]
+    branches: [ main, dev ]
   schedule:
     - cron: '0 4 * * 1'  # Run weekly at 4 AM on Monday
 
@@ -55,12 +55,12 @@ jobs:
       - name: NPM Audit
         run: |
           cd frontend
-          npm audit --production || true
+          pnpm audit --production
           
       - name: Python Safety Check
         run: |
           pip install safety
-          safety check -r requirements.txt || true
+          safety check -r requirements.txt
           
   container-scan:
     name: Scan Container
@@ -103,7 +103,6 @@ jobs:
           build-args: |
             TARGET=prod
           outputs: type=docker,dest=image.tar
-        continue-on-error: true
 
       - name: Verify image
         id: verify_image
@@ -126,7 +125,6 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
           timeout: '10m0s'
-        continue-on-error: true
 
       - name: Create empty SARIF file if missing
         run: |

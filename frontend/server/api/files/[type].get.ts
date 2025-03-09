@@ -35,19 +35,19 @@ export default defineEventHandler(async (event) => {
   try {
     // Debug log
     const dirPath = path.join('/app/data', type)
-    console.log('Attempting to read directory:', dirPath)
+    console.info('Attempting to read directory:', dirPath)
 
     // Make sure the directory exists, if not create it
     try {
       await fs.access(dirPath)
     }
     catch (error) {
-      console.log(`Creating directory ${dirPath} as it doesn't exist yet`)
+      console.info(`Creating directory ${dirPath} as it doesn't exist yet, error:`, error)
       await fs.mkdir(dirPath, { recursive: true })
     }
 
     const files = await getFileStats(dirPath)
-    console.log(`Found ${files.length} files in ${type}`)
+    console.info(`Found ${files.length} files in ${type}`)
 
     // Filter files based on type
     let filteredFiles = files

@@ -22,10 +22,10 @@ async function generateAtlas() {
 
   // Since process.cwd() is likely /app/frontend, go one level up for the data folder.
   const dataDir = path.join(process.cwd(), '..', 'data')
-  console.log('Using data directory:', dataDir)
+  console.info('Using data directory:', dataDir)
 
   // Log the files in the data directory and in metadata
-  console.log('Files in the data directory:', fs.readdirSync(dataDir))
+  console.info('Files in the data directory:', fs.readdirSync(dataDir))
 
   // Ensure metadata directory exists
   const metadataDir = path.join(dataDir, 'metadata')
@@ -34,14 +34,14 @@ async function generateAtlas() {
     fs.mkdirSync(metadataDir, { recursive: true })
   }
 
-  console.log('Files in the metadata directory:', fs.readdirSync(metadataDir))
+  console.info('Files in the metadata directory:', fs.readdirSync(metadataDir))
 
   // Update progress
   await updateStatus(10, 'Reading image metadata...')
 
   // Adjust the metadata path accordingly.
   const metadataPath = path.join(dataDir, 'metadata', 'images.json')
-  console.log('Looking for image metadata JSON at:', metadataPath)
+  console.info('Looking for image metadata JSON at:', metadataPath)
 
   if (!fs.existsSync(metadataPath)) {
     console.error('Image metadata JSON not found at', metadataPath)
@@ -120,11 +120,11 @@ async function generateAtlas() {
 
   // Calculate total area of all images and estimate required atlas size
   const totalImageArea = images.reduce((sum, img) => sum + (img.width * img.height), 0)
-  console.log(`Total area of all images: ${totalImageArea} pixels`)
+  console.info(`Total area of all images: ${totalImageArea} pixels`)
 
   // Estimate the atlas height if we use the full width
   const estimatedAtlasHeight = Math.ceil(totalImageArea / MAX_ATLAS_WIDTH)
-  console.log(`Estimated atlas height at full width: ${estimatedAtlasHeight} pixels`)
+  console.info(`Estimated atlas height at full width: ${estimatedAtlasHeight} pixels`)
 
   // Calculate scaling factor to fit within limits (if needed)
   let scalingFactor = 1.0
@@ -132,7 +132,7 @@ async function generateAtlas() {
     // Calculate scaling based on area
     const targetArea = Math.min(MAX_ATLAS_WIDTH * MAX_ATLAS_HEIGHT, MAX_PIXEL_COUNT)
     scalingFactor = Math.sqrt(targetArea / totalImageArea)
-    console.log(`Scaling all images by factor: ${scalingFactor.toFixed(4)}`)
+    console.info(`Scaling all images by factor: ${scalingFactor.toFixed(4)}`)
 
     // Apply scaling to image dimensions
     images.forEach((img) => {
@@ -175,7 +175,7 @@ async function generateAtlas() {
 
   const atlasWidth = MAX_ATLAS_WIDTH
   const atlasHeight = currentY + rowMaxHeight
-  console.log(`Final atlas dimensions: ${atlasWidth}x${atlasHeight}`)
+  console.info(`Final atlas dimensions: ${atlasWidth}x${atlasHeight}`)
 
   // Update progress
   await updateStatus(45, 'Creating blank atlas image...')
@@ -276,16 +276,16 @@ async function generateAtlas() {
   // Write the atlas image to disk in the data folder.
   const atlasImagePath = path.join(dataDir, 'atlas.png')
   await atlas.png().toFile(atlasImagePath)
-  console.log(`Atlas image saved to ${atlasImagePath}`)
+  console.info(`Atlas image saved to ${atlasImagePath}`)
 
   // Write the JSON file with atlas coordinates.
   const atlasJsonPath = path.join(dataDir, 'atlas.json')
   fs.writeFileSync(atlasJsonPath, JSON.stringify(atlasCoordinates, null, 2))
-  console.log(`Atlas JSON metadata saved to ${atlasJsonPath}`)
+  console.info(`Atlas JSON metadata saved to ${atlasJsonPath}`)
 
   // Clean up temporary files if they exist
   if (scalingFactor < 1.0) {
-    console.log('Cleaning up temporary files...')
+    console.info('Cleaning up temporary files...')
     // This is a simple example - consider using fs.rm with recursive option for proper cleanup
     images.forEach((img) => {
       const tempPath = path.join(tempDir, `scaled_${img.filename}`)
@@ -307,7 +307,7 @@ async function generateAtlas() {
 }
 
 // Export a handler that calls generateAtlas when this API endpoint is requested.
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async () => {
   try {
     // Reset status in case of previous runs
     const storage = useStorage('atlas')
