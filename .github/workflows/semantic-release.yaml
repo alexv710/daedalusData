@@ -88,13 +88,3 @@ jobs:
         run: |
           cd frontend
           npx semantic-release --debug
-
-      - name: Docker Build and Push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: ${{ steps.semantic.outputs.new_release_published == 'true' }}
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ steps.semantic.outputs.new_release_version }}
-        if: steps.semantic.outputs.new_release_published == 'true'
