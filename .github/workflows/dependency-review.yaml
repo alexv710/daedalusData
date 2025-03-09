@@ -3,8 +3,6 @@ name: Dependency Review
 on:
   pull_request:
     branches: [ main, dev, fb-dev-workflow ]
-  push:
-    branches: [ main, dev, fb-dev-workflow ]
 
 permissions:
   contents: read
@@ -22,4 +20,3 @@ jobs:
         with:
           deny-licenses: 'AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later'
           fail-on-severity: 'critical'
-          deny-severity-level: 'critical'
