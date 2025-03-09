@@ -87,5 +87,10 @@
     "commitizen": {
       "path": "cz-conventional-changelog"
     }
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexv710/daedalusData.git"
+  },
+  "version": "1.0.0-fb-dev-workflow.1"
 }
