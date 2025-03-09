@@ -3,6 +3,8 @@ name: Dependency Review
 on:
   pull_request:
     branches: [ main, dev, fb-dev-workflow ]
+  push:
+    branches: [ main, dev, fb-dev-workflow ]
 
 permissions:
   contents: read

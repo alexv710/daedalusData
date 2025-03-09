@@ -1,28 +1,38 @@
-FROM node:20-slim as dev
+# Base stage with Python
+FROM python:3.11-slim as python-base
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
-
-# Install Python and other dependencies, including build essentials for native modules
+# Install minimal Python dependencies
 RUN apt-get update && apt-get install -y \
-    python3-full \
-    python3-pip \
     python3-opencv \
-    build-essential \
-    python3-dev \
+    libssl-dev \
+    openssl \
+    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Create and activate virtual environment
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install Python dependencies
+# Install Python packages
 COPY requirements.txt .
-RUN pip3 install -r requirements.txt
-RUN pip3 install jupyter notebook
+RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir jupyter notebook
 
-# Set PNPM to ignore optional dependencies and use node-linker=hoisted
+# Node.js stage with minimal dependencies
+FROM node:20-alpine as dev
+WORKDIR /app
+
+# Install only the absolute essentials in the final image
+RUN apk add --no-cache \
+    python3 \
+    libstdc++ \
+    openssl
+
+# Copy Python installations from python-base
+COPY --from=python-base /usr/local /usr/local
+# Make sure the SSL certs are properly set up
+COPY --from=python-base /etc/ssl/certs /etc/ssl/certs
+
+# Install pnpm with minimal footprint
+RUN npm install -g pnpm && npm cache clean --force
+# Set PNPM configs
 RUN pnpm config set node-linker hoisted
 RUN pnpm config set --global ignore-optional true
 
