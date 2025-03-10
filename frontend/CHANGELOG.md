@@ -1,3 +1,9 @@
+## [1.0.0-dev.2](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.1...v1.0.0-dev.2) (2025-03-10)
+
+### Bug Fixes
+
+* :ambulance: fix nuxt version, as newer versions cause the vuetify theme to behave strangely ([6b51506](https://github.com/alexv710/daedalusData/commit/6b51506b74e46ee1ea1952030dd3ecada81fa0ab))
+
 ## 1.0.0-dev.1 (2025-03-10)
 
 ### Features
