@@ -101,8 +101,8 @@ void main() {
     vInstanceGrayedOut = instanceGrayedOut;
     vInstanceUV = instanceUV;
     vInstanceBorderColor = instanceBorderColor;
-    float width = max(1.0, instanceAspectRatio);
-    float height = max(1.0, 1.0 / instanceAspectRatio);
+    float width = max(1.0, instanceAspectRatio) * imageSizeFactor;
+    float height = max(1.0, 1.0 / instanceAspectRatio) * imageSizeFactor;
     vDimensions = vec2(width, height);
     vec3 scaledPosition = position * vec3(width, height, 1.0);
     vec4 worldPosition = instanceMatrix * vec4(scaledPosition, 1.0);
@@ -280,58 +280,6 @@ function createInstancedMesh(
   }
 
   return instancedMesh
-}
-
-function updateImageSizeUniform() {
-  if (instancedMeshRef.value && instancedMeshRef.value.material) {
-    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value
-  }
-}
-
-function updateInstanceSizes() {
-  if (!instancedMeshRef.value)
-    return
-
-  const tempMatrix = new THREE.Matrix4()
-  const tempPosition = new THREE.Vector3()
-  const tempRotation = new THREE.Quaternion()
-  const tempScale = new THREE.Vector3()
-
-  for (let i = 0; i < instancedMeshRef.value.count; i++) {
-    // Get current matrix
-    instancedMeshRef.value.getMatrixAt(i, tempMatrix)
-
-    // Decompose to get position and rotation
-    tempMatrix.decompose(tempPosition, tempRotation, tempScale)
-
-    // Calculate new scale based on aspect ratio
-    const aspectRatio = instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').getX(i)
-    const width = Math.max(1, aspectRatio) * imageSize.value
-    const height = Math.max(1, 1 / aspectRatio) * imageSize.value
-
-    // Create new matrix with updated scale
-    tempMatrix.compose(
-      tempPosition,
-      tempRotation,
-      new THREE.Vector3(width, height, 1),
-    )
-
-    // Set the updated matrix
-    instancedMeshRef.value.setMatrixAt(i, tempMatrix)
-  }
-
-  // Update the shader uniform
-  if (instancedMeshRef.value.material) {
-    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value
-  }
-
-  // Mark instance matrix as needing update
-  instancedMeshRef.value.instanceMatrix.needsUpdate = true
-
-  // Apply repulsion forces to avoid overlapping after size change
-  if (spreadFactor.value > 1.0 && repulsionStrength.value > 0) {
-    applyRepulsionForces(instancedMeshRef.value, 10)
-  }
 }
 
 /**
@@ -1148,8 +1096,9 @@ watch([spreadFactor, repulsionStrength], () => {
 })
 
 watch(imageSize, () => {
-  updateImageSizeUniform()
-  updateInstanceSizes()
+  if (instancedMeshRef.value && instancedMeshRef.value.material) {
+    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value;
+  }
 })
 
 // filter updates
