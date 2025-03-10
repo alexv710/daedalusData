@@ -448,9 +448,6 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
     return
   }
 
-  // Store the projection data for later use when spread factor changes
-  currentProjectionData.value = projectionData
-
   const projectionMap = new Map<string, { x: number, y: number }>()
   projectionData.forEach((item) => {
     projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
@@ -492,12 +489,14 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
     const key = instanceToImageMap.value.get(i)
     if (!key)
       continue
+    // remove the file ending
+    const id = key.replace(/\.[^/.]+$/, '')
 
     // Preserve the current scale by reading it from the existing matrix
     instancedMeshRef.value.getMatrixAt(i, matrix)
     matrix.decompose(tempPosition, tempRotation, tempScale)
 
-    const coords = projectionMap.get(key.toLowerCase())
+    const coords = projectionMap.get(id.toLowerCase())
     if (coords) {
       const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale * spreadFactor.value
       const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale * spreadFactor.value
@@ -1129,7 +1128,7 @@ watch(
           throw new Error('Failed to fetch projection data.')
         const projectionData = await response.json()
         currentProjectionData.value = projectionData
-        updateInstancePositions(projectionData)
+        updateInstancePositions(currentProjectionData.value)
         // Call animate() to ensure the scene updates.
         animate()
       }
