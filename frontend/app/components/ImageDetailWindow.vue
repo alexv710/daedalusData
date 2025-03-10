@@ -83,7 +83,7 @@ function formatValue(value) {
         <v-card elevation="3" class="rounded-lg">
           <v-card-title class="text-xl font-semibold">{{ imageId }}</v-card-title>
           <v-card-text class="flex justify-center p-4">
-            <v-img :src="`/data/images/${imageId}`" :alt="imageId" max-height="70vh" contain></v-img>
+            <v-img :src="`/data/images/${imageId}.png`" :alt="imageId" max-height="70vh" contain></v-img>
           </v-card-text>
         </v-card>
       </v-col>
