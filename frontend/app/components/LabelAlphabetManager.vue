@@ -141,7 +141,7 @@ async function submitForm() {
     else {
       // Create new label
       if (!formState.value.alphabetId) {
-        alert('Please select an alphabet.')
+        console.warn('Please select an alphabet.')
         return
       }
       const newLabel = {
@@ -259,8 +259,7 @@ onMounted(async () => {
             <v-switch
               v-model="labelSelectionMode"
               color="primary"
-              hide-details
-              inset
+              hide-details inset
             />
           </v-col>
           <v-col cols="auto">

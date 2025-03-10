@@ -7,27 +7,27 @@ export default defineEventHandler(async (event) => {
   try {
     // Use one level up as in your atlas generator.
     const dataDir = path.join(process.cwd(), '..', 'data')
-    console.log('Using data directory:', dataDir)
+    console.info('Using data directory:', dataDir)
 
     // Define the labels directory path.
     const labelsDir = path.join(dataDir, 'labels')
-    console.log('Labels directory path:', labelsDir)
+    console.info('Labels directory path:', labelsDir)
 
     // Create the labels directory if it doesn't exist.
     if (!fs.existsSync(labelsDir)) {
-      console.log('Labels directory does not exist. Creating it.')
+      console.info('Labels directory does not exist. Creating it.')
       fs.mkdirSync(labelsDir, { recursive: true })
     }
 
     // Read the request body.
     const body = await readBody(event)
-    console.log('Saving manifest:', body)
-    console.log('Writing manifest to:', labelsDir)
+    console.info('Saving manifest:', body)
+    console.info('Writing manifest to:', labelsDir)
 
     // Write the manifest file to the labels directory.
     const manifestPath = path.join(labelsDir, 'label_manifest.json')
     fs.writeFileSync(manifestPath, JSON.stringify(body, null, 2), 'utf-8')
-    console.log('Manifest saved successfully to', manifestPath)
+    console.info('Manifest saved successfully to', manifestPath)
 
     return { status: 'ok' }
   }
