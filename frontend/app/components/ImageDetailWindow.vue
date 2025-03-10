@@ -77,135 +77,47 @@ function formatValue(value) {
 </script>
 
 <template>
-  <div class="image-detail-window">
-    <div class="header">
-      <h1>{{ imageId }}</h1>
-    </div>
+  <v-container class="max-w-4xl mx-auto px-4">
+    <v-row v-if="imageData">
+      <v-col cols="12">
+        <v-card elevation="3" class="rounded-lg">
+          <v-card-title class="text-xl font-semibold">{{ imageId }}</v-card-title>
+          <v-card-text class="flex justify-center p-4">
+            <v-img :src="`/data/images/${imageId}`" :alt="imageId" max-height="70vh" contain></v-img>
+          </v-card-text>
+        </v-card>
+      </v-col>
 
-    <div v-if="imageData" class="content">
-      <div class="image-container">
-        <img :src="`/data/images/${imageId}`" :alt="imageId">
-      </div>
+      <v-col cols="12" class="mt-6">
+        <v-card elevation="3" class="rounded-lg">
+          <v-card-title class="text-lg font-medium py-3">Metadata</v-card-title>
+          <v-divider></v-divider>
+          <v-card-text class="p-0">
+            <v-list density="compact">
+              <v-list-item 
+                v-for="(value, key) in imageData" 
+                :key="key" 
+                v-if="isDisplayableField(key)"
+                class="px-4 py-2 border-b border-gray-100"
+              >
+                <template v-slot:prepend>
+                  <div class="font-medium text-gray-900 dark:text-gray-100 min-w-32">{{ formatKey(key) }}</div>
+                </template>
+                <v-list-item-subtitle>
+                  {{ formatValue(value) }}
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
 
-      <div class="metadata">
-        <h2>Metadata</h2>
-        <div class="metadata-grid">
-          <div v-for="(value, key) in imageData" :key="key" class="metadata-row">
-            <template v-if="isDisplayableField(key)">
-              <div class="metadata-key">
-                {{ formatKey(key) }}
-              </div>
-              <div class="metadata-value">
-                {{ formatValue(value) }}
-              </div>
-            </template>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-else class="loading">
-      Loading image data...
-    </div>
-  </div>
+    <v-row v-else>
+      <v-col cols="12" class="text-center py-10">
+        <v-progress-circular indeterminate color="primary"></v-progress-circular>
+        <div class="mt-4 text-gray-800 dark:text-gray-300">Loading image data...</div>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
-
-  <style scoped>
-  .image-detail-window {
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.header {
-  margin-bottom: 20px;
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 15px;
-}
-
-.header h1 {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1a202c;
-}
-
-.content {
-  display: flex;
-  flex-direction: column;
-  gap: 30px;
-}
-
-.image-container {
-  display: flex;
-  justify-content: center;
-  background-color: #f7fafc;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.image-container img {
-  max-width: 100%;
-  max-height: 70vh;
-  object-fit: contain;
-}
-
-.metadata {
-  background-color: #f7fafc;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.metadata h2 {
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 15px;
-  color: #2d3748;
-}
-
-.metadata-grid {
-  display: grid;
-  gap: 12px;
-}
-
-.metadata-row {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 16px;
-}
-
-.metadata-key {
-  font-weight: 500;
-  color: #4a5568;
-}
-
-.loading {
-  text-align: center;
-  padding: 40px;
-  color: #718096;
-  font-size: 18px;
-}
-
-@media (max-width: 640px) {
-  .metadata-row {
-    grid-template-columns: 1fr;
-    gap: 4px;
-  }
-
-  .metadata-key {
-    font-weight: 600;
-  }
-}
-</style>
