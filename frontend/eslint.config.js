@@ -30,6 +30,8 @@ export default nuxt(
       'dist/',
       '.output/',
       '.pnpm-store/',
+      '**/*.spec.ts',
+      '**/*.test.ts',
     ],
   },
 )

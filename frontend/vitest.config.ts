@@ -1,12 +1,22 @@
 import { fileURLToPath } from 'node:url'
-import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vitest/config'
+import { defineVitestConfig } from '@nuxt/test-utils/config'
 
-export default defineConfig({
-  plugins: [vue()],
+export default defineVitestConfig({
   test: {
     globals: true,
-    environment: 'jsdom',
+    environment: 'happy-dom',
+    include: ['server/**/*.test.ts', 'server/**/*.spec.ts', 'app/**/*.test.ts', 'app/**/*.spec.ts'],
+    environmentOptions: {
+      nuxt: {
+        rootDir: fileURLToPath(new URL('.', import.meta.url)),
+        overrides: {
+        },
+        mock: {
+          intersectionObserver: true,
+          indexedDb: true,
+        },
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
@@ -18,7 +28,11 @@ export default defineConfig({
         'app/components/icons/**',
       ],
     },
-    include: ['tests/**/*.test.ts', 'app/components/**/*.test.ts', 'app/stores/**/*.test.ts'],
+    deps: {
+      inline: [
+        'pinia',
+      ],
+    },
     alias: {
       '~/': fileURLToPath(new URL('./app/', import.meta.url)),
       '@/': fileURLToPath(new URL('./app/', import.meta.url)),

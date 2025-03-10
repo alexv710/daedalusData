@@ -999,11 +999,6 @@ function findHoveredInstance() {
 }
 
 // ----- Main onMounted Block -----
-onBeforeMount(async () => {
-  await imageStore.loadImageMetadata()
-  await imageStore.loadProjections()
-})
-
 onMounted(async () => {
   if (imageStore.images.size === 0) {
     await imageStore.loadImageMetadata()
