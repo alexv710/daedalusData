@@ -121,10 +121,10 @@ varying vec4 vInstanceUV;
 varying vec4 vInstanceBorderColor;
 
 void main() {
-    float borderThickness = 0.02;
+    // Smaller images get proportionally thicker borders
+    float borderThickness = 0.03 * (2.0 / (vDimensions.x + vDimensions.y));
     
     // Calculate local UV coordinates for border detection
-    // First convert back to 0-1 range within this instance
     vec2 instanceLocalUV = vec2(
         (vUV.x - vInstanceUV.x) / vInstanceUV.z,
         (vUV.y - vInstanceUV.y) / vInstanceUV.w
@@ -217,18 +217,22 @@ function createInstancedMesh(
     instanceHighlights[i] = 0.0
     instanceAspectRatios[i] = info.width / info.height
 
-    const coords = projectionMap!.get(id)!
-    const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale * spreadFactor.value
-    const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale * spreadFactor.value
+    if (useProjection) {
+      const coords = projectionMap.get(id)
+      if (coords) {
+        const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale * spreadFactor.value
+        const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale * spreadFactor.value
 
-    // Calculate Z-position based on image size (larger images go further back)
-    const imageArea = info.width * info.height
-    const normalizedSize = imageArea / maxImageArea
-    const zOffset = -normalizedSize * 0.3 + Math.random() * 0.01
+        // Calculate Z-position based on image size (larger images go further back)
+        const imageArea = info.width * info.height
+        const normalizedSize = imageArea / maxImageArea
+        const zOffset = -normalizedSize * 0.3 + Math.random() * 0.01
 
-    instancePositions[i * 3] = scaledX
-    instancePositions[i * 3 + 1] = scaledY
-    instancePositions[i * 3 + 2] = zOffset
+        instancePositions[i * 3] = scaledX
+        instancePositions[i * 3 + 1] = scaledY
+        instancePositions[i * 3 + 2] = zOffset
+      }
+    }
   }
 
   geometry.setAttribute('instanceUV', new THREE.InstancedBufferAttribute(instanceUVs, 4))
@@ -261,13 +265,10 @@ function createInstancedMesh(
 
     // Incorporate image size in the matrix
     const aspectRatio = instanceAspectRatios[i]
-    const width = Math.max(1, aspectRatio) * imageSize.value
-    const height = Math.max(1, 1 / aspectRatio) * imageSize.value
-
     matrix.compose(
       new THREE.Vector3(x, y, z),
       new THREE.Quaternion(),
-      new THREE.Vector3(width, height, 1),
+      new THREE.Vector3(1, 1, 1),
     )
 
     instancedMesh.setMatrixAt(i, matrix)
@@ -288,37 +289,33 @@ function createInstancedMesh(
  * @param iterations Number of iterations to run the algorithm
  */
 function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
-  if (!mesh)
-    return
+  if (!mesh) return
 
   const instanceCount = mesh.count
   const positions = []
   const zValues = []
+  const sizes = []
   const tempMatrix = new THREE.Matrix4()
   const tempPosition = new THREE.Vector3()
   const tempRotation = new THREE.Quaternion()
   const tempScale = new THREE.Vector3()
   const repFactor = (spreadFactor.value - 1) * repulsionStrength.value
 
-  // If spread factor is 1 or below, no repulsion needed
-  if (repFactor <= 0)
-    return
+  if (repFactor <= 0) return
 
-  // Extract current positions and scales
+  // Extract current positions, scales, and calculate actual image sizes
+  const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
   for (let i = 0; i < instanceCount; i++) {
     mesh.getMatrixAt(i, tempMatrix)
     tempMatrix.decompose(tempPosition, tempRotation, tempScale)
     positions.push({ x: tempPosition.x, y: tempPosition.y })
     zValues.push(tempPosition.z)
-  }
-
-  // Calculate sizes for overlapping detection
-  const sizes = []
-  const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
-  for (let i = 0; i < instanceCount; i++) {
+    // Get the precise aspect ratio for this image
     const aspectRatio = aspectRatios.getX(i)
     const width = Math.max(1, aspectRatio) * imageSize.value
     const height = Math.max(1, 1 / aspectRatio) * imageSize.value
+
+    // Store actual dimensions for overlap detection
     sizes.push({ width, height })
   }
 
@@ -329,8 +326,7 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
       const forces = { x: 0, y: 0 }
 
       for (let j = 0; j < instanceCount; j++) {
-        if (i === j)
-          continue
+        if (i === j) continue
 
         const posI = positions[i]
         const posJ = positions[j]
@@ -342,31 +338,29 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
         const dy = posJ.y - posI.y
         const distanceSquared = dx * dx + dy * dy
 
-        // Calculate combined bounding box size
+        // Calculate combined bounding box dimensions
         const combinedWidth = (sizeI.width + sizeJ.width) / 2
         const combinedHeight = (sizeI.height + sizeJ.height) / 2
 
         // Skip if too far apart (optimization)
-        const maxDistanceToCheck = combinedWidth + combinedHeight
-        if (distanceSquared > maxDistanceToCheck * maxDistanceToCheck * 2)
+        const maxDistanceToCheck = Math.max(combinedWidth, combinedHeight) * 2
+        if (distanceSquared > maxDistanceToCheck * maxDistanceToCheck)
           continue
 
         // Avoid division by zero
         const distance = Math.max(0.1, Math.sqrt(distanceSquared))
 
-        // Calculate repulsion force - stronger when closer
-        const force = repFactor / (distance * distance)
+        // Calculate repulsion force - stronger when closer and when images overlap more
+        const overlapFactor = (sizeI.width * sizeI.height + sizeJ.width * sizeJ.height) / 
+                             (Math.min(sizeI.width, sizeJ.width) * Math.min(sizeI.height, sizeJ.height))
+        const force = repFactor * overlapFactor / (distance * distance)
 
         // Apply force vector
-        const forceX = (dx / distance) * force
-        const forceY = (dy / distance) * force
-
-        // Accumulate forces (negative because we want repulsion)
-        forces.x -= forceX
-        forces.y -= forceY
+        forces.x -= (dx / distance) * force
+        forces.y -= (dy / distance) * force
       }
 
-      // Apply accumulated forces (dampen for stability)
+      // Apply accumulated forces with damping
       const damping = 0.3
       positions[i].x += forces.x * damping
       positions[i].y += forces.y * damping
@@ -889,7 +883,7 @@ function findHoveredInstance() {
       const mesh = obj
       const instanceCount = mesh.count
       const matrix = new THREE.Matrix4()
-      const aspectRatios = mesh.geometry.attributes.instanceAspectRatio
+      const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
 
       for (let instanceId = 0; instanceId < instanceCount; instanceId++) {
         mesh.getMatrixAt(instanceId, matrix)
@@ -899,8 +893,9 @@ function findHoveredInstance() {
           continue
 
         const aspectRatio = aspectRatios.getX(instanceId)
-        const width = Math.max(1, aspectRatio) * instanceScale.x
-        const height = Math.max(1, 1 / aspectRatio) * instanceScale.y
+        // Calculate accurate width and height for this instance
+        const width = Math.max(1, aspectRatio) * imageSize.value
+        const height = Math.max(1, 1 / aspectRatio) * imageSize.value
 
         boundingBox.setFromCenterAndSize(
           instancePosition,
@@ -926,8 +921,8 @@ function findHoveredInstance() {
               localIntersection.copy(intersection).applyMatrix4(matrix.invert())
 
               if (
-                Math.abs(localIntersection.x) <= width / 2
-                && Math.abs(localIntersection.y) <= height / 2
+                Math.abs(localIntersection.x) <= width / 2 &&
+                Math.abs(localIntersection.y) <= height / 2
               ) {
                 closestIntersection = distance
                 closestMesh = mesh
