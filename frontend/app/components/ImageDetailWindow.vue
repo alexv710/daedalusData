@@ -34,11 +34,6 @@ onMounted(async () => {
   }
 })
 
-function isDisplayableField(key) {
-  const skipFields = ['id', '_id', '__v']
-  return !skipFields.includes(key)
-}
-
 function formatKey(key) {
   return key
     .replace(/([A-Z])/g, ' $1')
@@ -77,31 +72,36 @@ function formatValue(value) {
 </script>
 
 <template>
-  <v-container class="max-w-4xl mx-auto px-4">
+  <v-container class="mx-auto max-w-4xl px-4">
     <v-row v-if="imageData">
       <v-col cols="12">
         <v-card elevation="3" class="rounded-lg">
-          <v-card-title class="text-xl font-semibold">{{ imageId }}</v-card-title>
+          <v-card-title class="text-xl font-semibold">
+            {{ imageId }}
+          </v-card-title>
           <v-card-text class="flex justify-center p-4">
-            <v-img :src="`/data/images/${imageId}.png`" :alt="imageId" max-height="70vh" contain></v-img>
+            <v-img :src="`/data/images/${imageId}.png`" :alt="imageId" max-height="70vh" contain />
           </v-card-text>
         </v-card>
       </v-col>
 
       <v-col cols="12" class="mt-6">
         <v-card elevation="3" class="rounded-lg">
-          <v-card-title class="text-lg font-medium py-3">Metadata</v-card-title>
-          <v-divider></v-divider>
+          <v-card-title class="py-3 text-lg font-medium">
+            Metadata
+          </v-card-title>
+          <v-divider />
           <v-card-text class="p-0">
             <v-list density="compact">
-              <v-list-item 
-                v-for="(value, key) in imageData" 
-                :key="key" 
-                v-if="isDisplayableField(key)"
-                class="px-4 py-2 border-b border-gray-100"
+              <v-list-item
+                v-for="(value, key) in imageData"
+                :key="key"
+                class="border-b border-gray-100 px-4 py-2"
               >
-                <template v-slot:prepend>
-                  <div class="font-medium text-gray-900 dark:text-gray-100 min-w-32">{{ formatKey(key) }}</div>
+                <template #prepend>
+                  <div class="min-w-32 text-gray-900 font-medium dark:text-gray-100">
+                    {{ formatKey(key) }}
+                  </div>
                 </template>
                 <v-list-item-subtitle>
                   {{ formatValue(value) }}
@@ -114,9 +114,11 @@ function formatValue(value) {
     </v-row>
 
     <v-row v-else>
-      <v-col cols="12" class="text-center py-10">
-        <v-progress-circular indeterminate color="primary"></v-progress-circular>
-        <div class="mt-4 text-gray-800 dark:text-gray-300">Loading image data...</div>
+      <v-col cols="12" class="py-10 text-center">
+        <v-progress-circular indeterminate color="primary" />
+        <div class="mt-4 text-gray-800 dark:text-gray-300">
+          Loading image data...
+        </div>
       </v-col>
     </v-row>
   </v-container>

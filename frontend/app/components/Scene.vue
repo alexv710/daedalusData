@@ -264,7 +264,6 @@ function createInstancedMesh(
     const z = instancePositions[i * 3 + 2]
 
     // Incorporate image size in the matrix
-    const aspectRatio = instanceAspectRatios[i]
     matrix.compose(
       new THREE.Vector3(x, y, z),
       new THREE.Quaternion(),
@@ -289,7 +288,8 @@ function createInstancedMesh(
  * @param iterations Number of iterations to run the algorithm
  */
 function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
-  if (!mesh) return
+  if (!mesh)
+    return
 
   const instanceCount = mesh.count
   const positions = []
@@ -301,7 +301,8 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
   const tempScale = new THREE.Vector3()
   const repFactor = (spreadFactor.value - 1) * repulsionStrength.value
 
-  if (repFactor <= 0) return
+  if (repFactor <= 0)
+    return
 
   // Extract current positions, scales, and calculate actual image sizes
   const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
@@ -326,7 +327,8 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
       const forces = { x: 0, y: 0 }
 
       for (let j = 0; j < instanceCount; j++) {
-        if (i === j) continue
+        if (i === j)
+          continue
 
         const posI = positions[i]
         const posJ = positions[j]
@@ -351,8 +353,8 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
         const distance = Math.max(0.1, Math.sqrt(distanceSquared))
 
         // Calculate repulsion force - stronger when closer and when images overlap more
-        const overlapFactor = (sizeI.width * sizeI.height + sizeJ.width * sizeJ.height) / 
-                             (Math.min(sizeI.width, sizeJ.width) * Math.min(sizeI.height, sizeJ.height))
+        const overlapFactor = (sizeI.width * sizeI.height + sizeJ.width * sizeJ.height)
+          / (Math.min(sizeI.width, sizeJ.width) * Math.min(sizeI.height, sizeJ.height))
         const force = repFactor * overlapFactor / (distance * distance)
 
         // Apply force vector
@@ -921,8 +923,8 @@ function findHoveredInstance() {
               localIntersection.copy(intersection).applyMatrix4(matrix.invert())
 
               if (
-                Math.abs(localIntersection.x) <= width / 2 &&
-                Math.abs(localIntersection.y) <= height / 2
+                Math.abs(localIntersection.x) <= width / 2
+                && Math.abs(localIntersection.y) <= height / 2
               ) {
                 closestIntersection = distance
                 closestMesh = mesh
@@ -1092,7 +1094,7 @@ watch([spreadFactor, repulsionStrength], () => {
 
 watch(imageSize, () => {
   if (instancedMeshRef.value && instancedMeshRef.value.material) {
-    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value;
+    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value
   }
 })
 
