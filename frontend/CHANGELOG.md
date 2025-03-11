@@ -1,3 +1,9 @@
+## [1.0.0-dev.5](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.4...v1.0.0-dev.5) (2025-03-11)
+
+### Bug Fixes
+
+* ignore the semantic versioning commits in the commitlint and lint js ([6d07687](https://github.com/alexv710/daedalusData/commit/6d07687633c2e0bef5ce0db852afffc8cf9aaeb2))
+
 ## [1.0.0-dev.4](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.3...v1.0.0-dev.4) (2025-03-11)
 
 ### Features
