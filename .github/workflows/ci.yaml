@@ -72,7 +72,7 @@ jobs:
           pnpm lint:ci
 
       - name: Check commit message format
-        uses: wagoid/commitlint-github-action@v5
+        uses: wagoid/commitlint-github-action@v6
         if: github.event_name == 'pull_request'
 
       - name: Lint Python notebooks
