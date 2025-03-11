@@ -1,0 +1,90 @@
+name: Semantic Release
+
+on:
+  push:
+    branches: [ main, dev ]
+
+jobs:
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Display Git Information
+        run: |
+          echo "Current branch: $(git branch --show-current)"
+          echo "All branches:"
+          git branch -a
+          echo "Remote URL: $(git remote get-url origin)"
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          pnpm install
+          pnpm add -D semantic-release @semantic-release/changelog @semantic-release/git conventional-changelog-conventionalcommits
+
+      - name: Update package.json
+        run: |
+          cd frontend
+          # Ensure the repository field is correct in package.json
+          jq '.repository = {"type":"git","url":"https://github.com/alexv710/daedalusData.git"}' package.json > package.json.tmp
+          mv package.json.tmp package.json
+          cat package.json
+
+      - name: Verify .releaserc.json exists
+        run: |
+          cd frontend
+          ls -la .releaserc.json
+          cat .releaserc.json
+
+      - name: Semantic Release
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd frontend
+          npx semantic-release --debug

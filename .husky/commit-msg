@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Change to frontend directory and run commitlint
+cd frontend
+npx --no -- commitlint --edit "$1"

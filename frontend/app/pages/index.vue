@@ -1,6 +1,4 @@
 <script setup lang="ts">
-const colorMode = useColorMode()
-
 interface FileInfo {
   name: string
   size: number
@@ -117,8 +115,7 @@ function startAtlasGeneration() {
         throw new Error('Failed to generate atlas')
       return res.json()
     })
-    .then((data) => {
-      console.log('Atlas generated:', data)
+    .then(() => {
       // Set to 100% complete
       atlasProgress.value = 100
       atlasProgressMessage.value = 'Atlas generation complete!'

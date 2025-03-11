@@ -101,8 +101,8 @@ void main() {
     vInstanceGrayedOut = instanceGrayedOut;
     vInstanceUV = instanceUV;
     vInstanceBorderColor = instanceBorderColor;
-    float width = max(1.0, instanceAspectRatio);
-    float height = max(1.0, 1.0 / instanceAspectRatio);
+    float width = max(1.0, instanceAspectRatio) * imageSizeFactor;
+    float height = max(1.0, 1.0 / instanceAspectRatio) * imageSizeFactor;
     vDimensions = vec2(width, height);
     vec3 scaledPosition = position * vec3(width, height, 1.0);
     vec4 worldPosition = instanceMatrix * vec4(scaledPosition, 1.0);
@@ -121,10 +121,10 @@ varying vec4 vInstanceUV;
 varying vec4 vInstanceBorderColor;
 
 void main() {
-    float borderThickness = 0.02;
+    // Smaller images get proportionally thicker borders
+    float borderThickness = 0.03 * (2.0 / (vDimensions.x + vDimensions.y));
     
     // Calculate local UV coordinates for border detection
-    // First convert back to 0-1 range within this instance
     vec2 instanceLocalUV = vec2(
         (vUV.x - vInstanceUV.x) / vInstanceUV.z,
         (vUV.y - vInstanceUV.y) / vInstanceUV.w
@@ -217,18 +217,22 @@ function createInstancedMesh(
     instanceHighlights[i] = 0.0
     instanceAspectRatios[i] = info.width / info.height
 
-    const coords = projectionMap!.get(id)!
-    const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale * spreadFactor.value
-    const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale * spreadFactor.value
+    if (useProjection) {
+      const coords = projectionMap.get(id)
+      if (coords) {
+        const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale * spreadFactor.value
+        const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale * spreadFactor.value
 
-    // Calculate Z-position based on image size (larger images go further back)
-    const imageArea = info.width * info.height
-    const normalizedSize = imageArea / maxImageArea
-    const zOffset = -normalizedSize * 0.3 + Math.random() * 0.01
+        // Calculate Z-position based on image size (larger images go further back)
+        const imageArea = info.width * info.height
+        const normalizedSize = imageArea / maxImageArea
+        const zOffset = -normalizedSize * 0.3 + Math.random() * 0.01
 
-    instancePositions[i * 3] = scaledX
-    instancePositions[i * 3 + 1] = scaledY
-    instancePositions[i * 3 + 2] = zOffset
+        instancePositions[i * 3] = scaledX
+        instancePositions[i * 3 + 1] = scaledY
+        instancePositions[i * 3 + 2] = zOffset
+      }
+    }
   }
 
   geometry.setAttribute('instanceUV', new THREE.InstancedBufferAttribute(instanceUVs, 4))
@@ -260,14 +264,10 @@ function createInstancedMesh(
     const z = instancePositions[i * 3 + 2]
 
     // Incorporate image size in the matrix
-    const aspectRatio = instanceAspectRatios[i]
-    const width = Math.max(1, aspectRatio) * imageSize.value
-    const height = Math.max(1, 1 / aspectRatio) * imageSize.value
-
     matrix.compose(
       new THREE.Vector3(x, y, z),
       new THREE.Quaternion(),
-      new THREE.Vector3(width, height, 1),
+      new THREE.Vector3(1, 1, 1),
     )
 
     instancedMesh.setMatrixAt(i, matrix)
@@ -282,58 +282,6 @@ function createInstancedMesh(
   return instancedMesh
 }
 
-function updateImageSizeUniform() {
-  if (instancedMeshRef.value && instancedMeshRef.value.material) {
-    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value
-  }
-}
-
-function updateInstanceSizes() {
-  if (!instancedMeshRef.value)
-    return
-
-  const tempMatrix = new THREE.Matrix4()
-  const tempPosition = new THREE.Vector3()
-  const tempRotation = new THREE.Quaternion()
-  const tempScale = new THREE.Vector3()
-
-  for (let i = 0; i < instancedMeshRef.value.count; i++) {
-    // Get current matrix
-    instancedMeshRef.value.getMatrixAt(i, tempMatrix)
-
-    // Decompose to get position and rotation
-    tempMatrix.decompose(tempPosition, tempRotation, tempScale)
-
-    // Calculate new scale based on aspect ratio
-    const aspectRatio = instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').getX(i)
-    const width = Math.max(1, aspectRatio) * imageSize.value
-    const height = Math.max(1, 1 / aspectRatio) * imageSize.value
-
-    // Create new matrix with updated scale
-    tempMatrix.compose(
-      tempPosition,
-      tempRotation,
-      new THREE.Vector3(width, height, 1),
-    )
-
-    // Set the updated matrix
-    instancedMeshRef.value.setMatrixAt(i, tempMatrix)
-  }
-
-  // Update the shader uniform
-  if (instancedMeshRef.value.material) {
-    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value
-  }
-
-  // Mark instance matrix as needing update
-  instancedMeshRef.value.instanceMatrix.needsUpdate = true
-
-  // Apply repulsion forces to avoid overlapping after size change
-  if (spreadFactor.value > 1.0 && repulsionStrength.value > 0) {
-    applyRepulsionForces(instancedMeshRef.value, 10)
-  }
-}
-
 /**
  * Apply force-directed repulsion to avoid overlapping instances
  * @param mesh The instanced mesh
@@ -346,31 +294,29 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
   const instanceCount = mesh.count
   const positions = []
   const zValues = []
+  const sizes = []
   const tempMatrix = new THREE.Matrix4()
   const tempPosition = new THREE.Vector3()
   const tempRotation = new THREE.Quaternion()
   const tempScale = new THREE.Vector3()
   const repFactor = (spreadFactor.value - 1) * repulsionStrength.value
 
-  // If spread factor is 1 or below, no repulsion needed
   if (repFactor <= 0)
     return
 
-  // Extract current positions and scales
+  // Extract current positions, scales, and calculate actual image sizes
+  const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
   for (let i = 0; i < instanceCount; i++) {
     mesh.getMatrixAt(i, tempMatrix)
     tempMatrix.decompose(tempPosition, tempRotation, tempScale)
     positions.push({ x: tempPosition.x, y: tempPosition.y })
     zValues.push(tempPosition.z)
-  }
-
-  // Calculate sizes for overlapping detection
-  const sizes = []
-  const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
-  for (let i = 0; i < instanceCount; i++) {
+    // Get the precise aspect ratio for this image
     const aspectRatio = aspectRatios.getX(i)
     const width = Math.max(1, aspectRatio) * imageSize.value
     const height = Math.max(1, 1 / aspectRatio) * imageSize.value
+
+    // Store actual dimensions for overlap detection
     sizes.push({ width, height })
   }
 
@@ -394,31 +340,29 @@ function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
         const dy = posJ.y - posI.y
         const distanceSquared = dx * dx + dy * dy
 
-        // Calculate combined bounding box size
+        // Calculate combined bounding box dimensions
         const combinedWidth = (sizeI.width + sizeJ.width) / 2
         const combinedHeight = (sizeI.height + sizeJ.height) / 2
 
         // Skip if too far apart (optimization)
-        const maxDistanceToCheck = combinedWidth + combinedHeight
-        if (distanceSquared > maxDistanceToCheck * maxDistanceToCheck * 2)
+        const maxDistanceToCheck = Math.max(combinedWidth, combinedHeight) * 2
+        if (distanceSquared > maxDistanceToCheck * maxDistanceToCheck)
           continue
 
         // Avoid division by zero
         const distance = Math.max(0.1, Math.sqrt(distanceSquared))
 
-        // Calculate repulsion force - stronger when closer
-        const force = repFactor / (distance * distance)
+        // Calculate repulsion force - stronger when closer and when images overlap more
+        const overlapFactor = (sizeI.width * sizeI.height + sizeJ.width * sizeJ.height)
+          / (Math.min(sizeI.width, sizeJ.width) * Math.min(sizeI.height, sizeJ.height))
+        const force = repFactor * overlapFactor / (distance * distance)
 
         // Apply force vector
-        const forceX = (dx / distance) * force
-        const forceY = (dy / distance) * force
-
-        // Accumulate forces (negative because we want repulsion)
-        forces.x -= forceX
-        forces.y -= forceY
+        forces.x -= (dx / distance) * force
+        forces.y -= (dy / distance) * force
       }
 
-      // Apply accumulated forces (dampen for stability)
+      // Apply accumulated forces with damping
       const damping = 0.3
       positions[i].x += forces.x * damping
       positions[i].y += forces.y * damping
@@ -448,9 +392,6 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
     return
   }
 
-  // Store the projection data for later use when spread factor changes
-  currentProjectionData.value = projectionData
-
   const projectionMap = new Map<string, { x: number, y: number }>()
   projectionData.forEach((item) => {
     projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
@@ -474,7 +415,7 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
 
   // Find largest image area for Z-ordering
   let maxImageArea = 0
-  instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').array.forEach((aspectRatio, i) => {
+  instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').array.forEach((aspectRatio: number) => {
     // Approximate the area using aspect ratio (assuming normalized size of 1)
     const width = Math.max(1, aspectRatio)
     const height = Math.max(1, 1 / aspectRatio)
@@ -492,12 +433,14 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
     const key = instanceToImageMap.value.get(i)
     if (!key)
       continue
+    // remove the file ending
+    const id = key.replace(/\.[^/.]+$/, '')
 
     // Preserve the current scale by reading it from the existing matrix
     instancedMeshRef.value.getMatrixAt(i, matrix)
     matrix.decompose(tempPosition, tempRotation, tempScale)
 
-    const coords = projectionMap.get(key.toLowerCase())
+    const coords = projectionMap.get(id.toLowerCase())
     if (coords) {
       const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale * spreadFactor.value
       const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale * spreadFactor.value
@@ -942,7 +885,7 @@ function findHoveredInstance() {
       const mesh = obj
       const instanceCount = mesh.count
       const matrix = new THREE.Matrix4()
-      const aspectRatios = mesh.geometry.attributes.instanceAspectRatio
+      const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
 
       for (let instanceId = 0; instanceId < instanceCount; instanceId++) {
         mesh.getMatrixAt(instanceId, matrix)
@@ -952,8 +895,9 @@ function findHoveredInstance() {
           continue
 
         const aspectRatio = aspectRatios.getX(instanceId)
-        const width = Math.max(1, aspectRatio) * instanceScale.x
-        const height = Math.max(1, 1 / aspectRatio) * instanceScale.y
+        // Calculate accurate width and height for this instance
+        const width = Math.max(1, aspectRatio) * imageSize.value
+        const height = Math.max(1, 1 / aspectRatio) * imageSize.value
 
         boundingBox.setFromCenterAndSize(
           instancePosition,
@@ -999,11 +943,6 @@ function findHoveredInstance() {
 }
 
 // ----- Main onMounted Block -----
-onBeforeMount(async () => {
-  await imageStore.loadImageMetadata()
-  await imageStore.loadProjections()
-})
-
 onMounted(async () => {
   if (imageStore.images.size === 0) {
     await imageStore.loadImageMetadata()
@@ -1134,7 +1073,7 @@ watch(
           throw new Error('Failed to fetch projection data.')
         const projectionData = await response.json()
         currentProjectionData.value = projectionData
-        updateInstancePositions(projectionData)
+        updateInstancePositions(currentProjectionData.value)
         // Call animate() to ensure the scene updates.
         animate()
       }
@@ -1154,8 +1093,9 @@ watch([spreadFactor, repulsionStrength], () => {
 })
 
 watch(imageSize, () => {
-  updateImageSizeUniform()
-  updateInstanceSizes()
+  if (instancedMeshRef.value && instancedMeshRef.value.material) {
+    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value
+  }
 })
 
 // filter updates
@@ -1340,9 +1280,9 @@ defineExpose({
         </div>
 
         <div class="mt-3 text-xs">
-            <p><strong>- Global Spread</strong> to scale all images</p>
-            <p><strong>- Repulsion Force</strong> for local overplotting</p>
-            <p><strong>- Image Size</strong> to control detail visibility</p>
+          <p><strong>- Global Spread</strong> to scale all images</p>
+          <p><strong>- Repulsion Force</strong> for local overplotting</p>
+          <p><strong>- Image Size</strong> to control detail visibility</p>
         </div>
       </div>
 

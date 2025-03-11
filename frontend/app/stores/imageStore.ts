@@ -21,16 +21,46 @@ export const useImageStore = defineStore('image', () => {
 
   // Load metadata from the JSON file and populate the store.
   async function loadImageMetadata() {
-    const response = await fetch('/data/metadata/images.json')
-    if (!response.ok) {
-      throw new Error('Failed to fetch image metadata')
+    try {
+    // First, fetch the atlas data to get the list of valid images
+      const atlasResponse = await fetch('/data/atlas.json')
+      if (!atlasResponse.ok) {
+        throw new Error('Failed to fetch atlas data')
+      }
+      const atlasData = await atlasResponse.json()
+
+      // Then, fetch the metadata
+      const metadataResponse = await fetch('/data/metadata/images.json')
+      if (!metadataResponse.ok) {
+        throw new Error('Failed to fetch image metadata')
+      }
+      const metadataData = await metadataResponse.json()
+      const newMap = new Map()
+
+      for (const imageKey in atlasData) {
+        const imageId = imageKey.split('.')[0]
+        const metadata = metadataData[imageId] || {}
+
+        newMap.set(imageId, {
+          ...metadata,
+        })
+      }
+      images.value = newMap
+
+      let instanceCounter = 0
+      instanceToImageMap.value.clear()
+      imageToInstanceMap.value.clear()
+
+      for (const imageId of newMap.keys()) {
+        instanceToImageMap.value.set(instanceCounter, imageId)
+        imageToInstanceMap.value.set(imageId, instanceCounter)
+        instanceCounter++
+      }
     }
-    const rawData = await response.json()
-    const newMap = new Map()
-    for (const key in rawData) {
-      newMap.set(key, { ...rawData[key] })
+    catch (error) {
+      console.error('Error loading image metadata:', error)
+      throw error
     }
-    images.value = newMap
   }
 
   // Computed property to list all image ids.

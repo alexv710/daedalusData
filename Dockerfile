@@ -1,16 +1,16 @@
 FROM node:20-slim as dev
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm with minimal cache
+RUN npm install -g pnpm && npm cache clean --force
 
-# Install Python and other dependencies, including build essentials for native modules
+# Install minimal Python and dependencies
 RUN apt-get update && apt-get install -y \
-    python3-full \
+    python3-minimal \
     python3-pip \
+    python3-venv \
     python3-opencv \
-    build-essential \
-    python3-dev \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Create and activate virtual environment
@@ -19,10 +19,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip3 install -r requirements.txt
-RUN pip3 install jupyter notebook
+RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir jupyter notebook
 
-# Set PNPM to ignore optional dependencies and use node-linker=hoisted
+# Set PNPM configs
 RUN pnpm config set node-linker hoisted
 RUN pnpm config set --global ignore-optional true
 

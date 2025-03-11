@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Change to frontend directory and run checks
+cd frontend
+pnpm lint
+pnpm test:ci -- --run
