@@ -1,3 +1,20 @@
+## [1.0.0-dev.4](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.3...v1.0.0-dev.4) (2025-03-11)
+
+### Features
+
+* :sparkles: support different aspect ratios and improve performance in finding hovered meshes ([631573f](https://github.com/alexv710/daedalusData/commit/631573fa4a8b8b1ef4c44dd551335e646b7b307e))
+
+### Bug Fixes
+
+* add the png file ending in the image detail window ([0bfecd2](https://github.com/alexv710/daedalusData/commit/0bfecd2fe62887d3daf1533df2fffe6b1cf62eb5))
+* have all store states with imageids without the file ending ([2706ac1](https://github.com/alexv710/daedalusData/commit/2706ac12e91ff3c93df3af1b86b967db01144d94))
+* remove the file ending from the keys, otherwise the map was undefined ([787992e](https://github.com/alexv710/daedalusData/commit/787992e3452a76d301728d55c70ec3883f353d85))
+* use vuetify components for the detail window in order for the theme to adjust automatically ([1159547](https://github.com/alexv710/daedalusData/commit/1159547566249a5649f1019c1d3c12ace3c07bf6))
+
+### Performance Improvements
+
+* :zap: simplify the image size application to the instanced meshes, was convoluted before ([758bcbe](https://github.com/alexv710/daedalusData/commit/758bcbed355838573d30e366ce109cb66d0e3743))
+
 ## [1.0.0-dev.3](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.2...v1.0.0-dev.3) (2025-03-10)
 
 ## [1.0.0-dev.2](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.1...v1.0.0-dev.2) (2025-03-10)
