@@ -33,4 +33,7 @@ module.exports = {
       ],
     ],
   },
+  ignores: [
+    commit => commit.includes('chore(release)') || commit.includes('[skip ci]'),
+  ],
 }

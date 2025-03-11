@@ -24,8 +24,7 @@ function onSelect(value: string) {
     <v-card-text class="ma-0 pa-1">
       <v-select
         v-model="selectedProjection"
-
-        dense hide-details
+        hide-details dense
         label="Select Projection"
         :items="imageStore.availableProjections"
         class="ma-0 pa-0"
