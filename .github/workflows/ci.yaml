@@ -123,7 +123,7 @@ jobs:
           pnpm run dev & sleep 10 && pnpm test:ci
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           directory: ./frontend/coverage
         if: always()
