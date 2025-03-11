@@ -38,9 +38,10 @@ export const useImageStore = defineStore('image', () => {
       const newMap = new Map()
 
       for (const imageKey in atlasData) {
-        const metadata = metadataData[imageKey] || {}
+        const imageId = imageKey.split('.')[0]
+        const metadata = metadataData[imageId] || {}
 
-        newMap.set(imageKey, {
+        newMap.set(imageId, {
           ...metadata,
         })
       }
@@ -50,9 +51,9 @@ export const useImageStore = defineStore('image', () => {
       instanceToImageMap.value.clear()
       imageToInstanceMap.value.clear()
 
-      for (const imageKey of newMap.keys()) {
-        instanceToImageMap.value.set(instanceCounter, imageKey)
-        imageToInstanceMap.value.set(imageKey, instanceCounter)
+      for (const imageId of newMap.keys()) {
+        instanceToImageMap.value.set(instanceCounter, imageId)
+        imageToInstanceMap.value.set(imageId, instanceCounter)
         instanceCounter++
       }
     }

@@ -25,7 +25,7 @@ function onSelect(value: string) {
       <v-select
         v-model="selectedProjection"
 
-        hide-details dense
+        dense hide-details
         label="Select Projection"
         :items="imageStore.availableProjections"
         class="ma-0 pa-0"
