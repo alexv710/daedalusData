@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Dependency Review
-        uses: actions/dependency-review-action@v3
+        uses: actions/dependency-review-action@v4
         with:
           deny-licenses: 'AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later'
           fail-on-severity: 'critical'
