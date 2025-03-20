@@ -141,7 +141,7 @@ async function submitForm() {
     else {
       // Create new label
       if (!formState.value.alphabetId) {
-        alert('Please select an alphabet.')
+        console.warn('Please select an alphabet.')
         return
       }
       const newLabel = {
@@ -152,6 +152,13 @@ async function submitForm() {
       }
       await labelStore.addLabel(formState.value.alphabetId, newLabel)
     }
+  }
+  showForm.value = false
+}
+
+async function deleteForm() {
+  if (formType.value === 'Label') {
+    await labelStore.removeLabel(editingItem.value.alphabetId, editingItem.value.label.id)
   }
   showForm.value = false
 }
@@ -250,10 +257,9 @@ onMounted(async () => {
           </v-col>
           <v-col cols="auto">
             <v-switch
-              :model-value="labelSelectionMode"
+              v-model="labelSelectionMode"
               color="primary"
-              hide-details
-              inset
+              inset hide-details
             />
           </v-col>
           <v-col cols="auto">
@@ -476,6 +482,9 @@ onMounted(async () => {
           />
         </v-card-text>
         <v-card-actions>
+          <v-btn variant="text" color="error" @click="deleteForm">
+            Delete
+          </v-btn>
           <v-spacer />
           <v-btn variant="text" color="primary" @click="submitForm">
             Save

@@ -11,7 +11,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['add-chart'])
+const emit = defineEmits(['addChart'])
 
 const dialog = ref(false)
 const selectedAttribute = ref(null)
@@ -20,7 +20,7 @@ const selectedAttribute = ref(null)
 function handleButtonClick() {
   if (props.chartType === 'violin') {
     // For violin plots, directly add without showing the dialog
-    emit('add-chart')
+    emit('addChart')
   }
   else {
     // For boxplots, open the dialog to select an attribute
@@ -30,7 +30,7 @@ function handleButtonClick() {
 
 function addChart() {
   if (selectedAttribute.value) {
-    emit('add-chart', selectedAttribute.value)
+    emit('addChart', selectedAttribute.value)
     selectedAttribute.value = null
   }
 

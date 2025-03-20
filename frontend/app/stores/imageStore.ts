@@ -21,16 +21,46 @@ export const useImageStore = defineStore('image', () => {
 
   // Load metadata from the JSON file and populate the store.
   async function loadImageMetadata() {
-    const response = await fetch('/data/metadata/images.json')
-    if (!response.ok) {
-      throw new Error('Failed to fetch image metadata')
+    try {
+    // First, fetch the atlas data to get the list of valid images
+      const atlasResponse = await fetch('/data/atlas.json')
+      if (!atlasResponse.ok) {
+        throw new Error('Failed to fetch atlas data')
+      }
+      const atlasData = await atlasResponse.json()
+
+      // Then, fetch the metadata
+      const metadataResponse = await fetch('/data/metadata/images.json')
+      if (!metadataResponse.ok) {
+        throw new Error('Failed to fetch image metadata')
+      }
+      const metadataData = await metadataResponse.json()
+      const newMap = new Map()
+
+      for (const imageKey in atlasData) {
+        const imageId = imageKey.split('.')[0]
+        const metadata = metadataData[imageId] || {}
+
+        newMap.set(imageId, {
+          ...metadata,
+        })
+      }
+      images.value = newMap
+
+      let instanceCounter = 0
+      instanceToImageMap.value.clear()
+      imageToInstanceMap.value.clear()
+
+      for (const imageId of newMap.keys()) {
+        instanceToImageMap.value.set(instanceCounter, imageId)
+        imageToInstanceMap.value.set(imageId, instanceCounter)
+        instanceCounter++
+      }
     }
-    const rawData = await response.json()
-    const newMap = new Map()
-    for (const key in rawData) {
-      newMap.set(key, { ...rawData[key] })
+    catch (error) {
+      console.error('Error loading image metadata:', error)
+      throw error
     }
-    images.value = newMap
   }
 
   // Computed property to list all image ids.
@@ -228,65 +258,85 @@ export const useImageStore = defineStore('image', () => {
     // If no filters are active, include all images
     const hasActiveFilters = Object.values(activeFilters.value).some(filter => filter.active)
 
+    // Create a Set to store filtered instance IDs
+    const newFilteredInstanceIds = new Set()
+
     if (!hasActiveFilters) {
       // Get all instance IDs that have corresponding image keys
-      const allInstanceIds = new Set()
-
       // Iterate through imageToInstanceMap to ensure we're getting valid mappings
       imageKeys.value.forEach((imageKey) => {
         const instanceId = imageToInstanceMap.value.get(imageKey)
         if (instanceId !== undefined) {
-          allInstanceIds.add(instanceId)
+          newFilteredInstanceIds.add(instanceId)
         }
       })
+    }
+    else {
+      // Filter the images based on active filters
+      imageKeys.value.forEach((id) => {
+        const img = images.value.get(id)
+        if (!img)
+          return
 
-      filteredImageIds.value = allInstanceIds
-      return
+        // Check if the image passes all active filters
+        const passesAllFilters = Object.entries(activeFilters.value).every(([attr, filter]) => {
+          // Skip inactive filters
+          if (!filter.active)
+            return true
+
+          const value = img[attr]
+
+          if (filter.type === 'numeric') {
+          // Handle missing values for numeric filters - exclude by default
+            if (value === undefined || value === null)
+              return false
+
+            // For numeric filters, check if value is within range
+            return value >= filter.currentMin && value <= filter.currentMax
+          }
+          else if (filter.type === 'categorical') {
+          // For null/undefined values in categorical filters, check if 'null' is in the selected values
+            if (value === undefined || value === null) {
+              return filter.selected.includes('null')
+            }
+
+            // For categorical filters, check if value is in selected values
+            return filter.selected.includes(String(value))
+          }
+
+          return true
+        })
+
+        if (passesAllFilters) {
+        // Convert image key to instance ID
+          const instanceId = imageToInstanceMap.value.get(id)
+          if (instanceId !== undefined) {
+            newFilteredInstanceIds.add(instanceId)
+          }
+        }
+      })
     }
 
-    // Filter the images based on active filters
-    const filtered = new Set()
+    // Update the filtered image IDs
+    filteredImageIds.value = newFilteredInstanceIds
 
-    imageKeys.value.forEach((id) => {
-      const img = images.value.get(id)
-      if (!img)
-        return
+    // Remove selections for any filtered-out images
+    removeFilteredOutSelections()
+  }
 
-      // Check if the image passes all active filters
-      const passesAllFilters = Object.entries(activeFilters.value).every(([attr, filter]) => {
-        // Skip inactive filters
-        if (!filter.active)
-          return true
+  function removeFilteredOutSelections() {
+    // Create a temporary set for image keys that remain selected
+    const newSelectedIds = new Set()
 
-        const value = img[attr]
-
-        // Handle missing values - exclude by default when filter is active
-        if (value === undefined || value === null)
-          return false
-
-        if (filter.type === 'numeric') {
-          // For numeric filters, check if value is within range
-          return value >= filter.currentMin && value <= filter.currentMax
-        }
-        else if (filter.type === 'categorical') {
-          // For categorical filters, check if value is in selected values
-          return filter.selected.includes(String(value))
-        }
-
-        return true
-      })
-
-      if (passesAllFilters) {
-        filtered.add(id)
+    // Only keep selections that are in the filtered set
+    selectedIds.value.forEach((imageKey) => {
+      const instanceId = imageToInstanceMap.value.get(imageKey)
+      if (instanceId !== undefined && filteredImageIds.value.has(instanceId)) {
+        newSelectedIds.add(imageKey)
       }
     })
 
-    // Convert filtered image keys to instance IDs
-    filteredImageIds.value = new Set(
-      Array.from(filtered)
-        .map(imageKey => imageToInstanceMap.value.get(imageKey))
-        .filter(Boolean),
-    )
+    selectedIds.value = newSelectedIds
   }
 
   // Update a numerical filter
@@ -370,80 +420,100 @@ export const useImageStore = defineStore('image', () => {
 
   // Count of filtered images
   const filteredImageCount = computed(() => filteredImageIds.value.size)
-
   // Actions for selection.
   function clearSelection() {
     selectedIds.value.clear()
   }
-  function addSelection(key) {
-    selectedIds.value.add(key)
-  }
-  function addManySelection(keys) {
-    selectedIds.value = new Set([...selectedIds.value, ...keys])
-  }
-  function removeSelection(key) {
-    selectedIds.value.delete(key)
-  }
-  function removeManySelection(keys) {
-    keys.forEach((key) => {
-      selectedIds.value.delete(key)
-    })
-  }
-  function toggleSelection(key) {
-    if (selectedIds.value.has(key)) {
-      selectedIds.value.delete(key)
+
+  function addSelection(id) {
+    const instanceId = imageToInstanceMap.value.get(id)
+    if (instanceId !== undefined && filteredImageIds.value.has(instanceId)) {
+      selectedIds.value.add(id)
     }
-    else {
-      selectedIds.value.add(key)
-    }
-  }
-  function batchSelect(keys) {
-    selectedIds.value = new Set([...selectedIds.value, ...keys])
   }
 
+  function addManySelection(ids) {
+    const filteredIds = ids.filter((id) => {
+      const instanceId = imageToInstanceMap.value.get(id)
+      return instanceId !== undefined && filteredImageIds.value.has(instanceId)
+    })
+
+    selectedIds.value = new Set([...selectedIds.value, ...filteredIds])
+  }
+
+  function removeSelection(id) {
+    selectedIds.value.delete(id)
+  }
+
+  function removeManySelection(ids) {
+    ids.forEach((id) => {
+      selectedIds.value.delete(id)
+    })
+  }
+
+  function toggleSelection(id) {
+    if (selectedIds.value.has(id)) {
+      selectedIds.value.delete(id)
+    }
+    else {
+      const instanceId = imageToInstanceMap.value.get(id)
+      if (instanceId !== undefined && filteredImageIds.value.has(instanceId)) {
+        selectedIds.value.add(id)
+      }
+    }
+  }
+
+  function batchSelect(ids: Set<string>) {
+    const filteredIds = [...ids].filter((id) => {
+      const instanceId = imageToInstanceMap.value.get(id)
+      return instanceId !== undefined && filteredImageIds.value.has(instanceId)
+    })
+
+    selectedIds.value = new Set([...selectedIds.value, ...filteredIds])
+  }
   // Actions for highlighting.
   function clearHighlights() {
     highlightedIds.value.clear()
   }
-  function addHighlight(key) {
-    highlightedIds.value.add(key)
+  function addHighlight(id) {
+    highlightedIds.value.add(id)
   }
-  function batchHighlight(keys) {
-    highlightedIds.value = new Set([...highlightedIds.value, ...keys])
+  function batchHighlight(ids) {
+    highlightedIds.value = new Set([...highlightedIds.value, ...ids])
   }
-  function removeHighlight(key) {
-    highlightedIds.value.delete(key)
+  function removeHighlight(id) {
+    highlightedIds.value.delete(id)
   }
-  function toggleHighlight(key) {
-    if (highlightedIds.value.has(key)) {
-      highlightedIds.value.delete(key)
+  function toggleHighlight(id) {
+    if (highlightedIds.value.has(id)) {
+      highlightedIds.value.delete(id)
     }
     else {
-      highlightedIds.value.add(key)
+      highlightedIds.value.add(id)
     }
   }
 
   // Actions for focus/hover state
-  function setHoveredImage(key) {
-    hoveredId.value = key
+  function setHoveredImage(id) {
+    hoveredId.value = id
 
     // If we have a detail window open and it's not locked, update it
     if (imageDetailWindow.value && !isImageFocusLocked.value) {
-      updateDetailWindow(key)
+      updateDetailWindow(id)
     }
   }
 
-  function setFocusedImage(key) {
-    focusedId.value = key
+  function setFocusedImage(id) {
+    focusedId.value = id
   }
 
-  function lockImageFocus(key) {
-    focusedId.value = key
+  function lockImageFocus(id) {
+    focusedId.value = id
     isImageFocusLocked.value = true
 
     // If we have a detail window open, update it
     if (imageDetailWindow.value) {
-      updateDetailWindow(key)
+      updateDetailWindow(id)
     }
   }
 
@@ -472,9 +542,6 @@ export const useImageStore = defineStore('image', () => {
       'imageDetail',
       'width=800,height=800,resizable=yes,scrollbars=yes',
     )
-
-    // For debugging
-    console.log(`Opened detail window for image: ${imageId}`)
   }
 
   function closeDetailWindow() {

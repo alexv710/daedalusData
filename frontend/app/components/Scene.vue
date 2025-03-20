@@ -31,6 +31,11 @@ const rendererRef = ref<THREE.WebGLRenderer | null>(null)
 const sceneRef = shallowRef<THREE.Scene | null>(null)
 const instancedMeshRef = shallowRef<THREE.InstancedMesh | null>(null)
 const count = ref(0)
+const spreadFactor = ref(1.1)
+const imageSize = ref(1.0)
+const repulsionStrength = ref(0.1)
+const currentProjectionData = ref<any[]>([])
+const isControlsOpen = ref(true)
 
 // ----- Raycasting & Lasso Handling -----
 const raycaster = new THREE.Raycaster()
@@ -50,7 +55,7 @@ const dragThreshold = 5
 const lastHovered = { index: -1, mesh: null }
 const leftClickStartPos = ref<THREE.Vector2 | null>(null)
 const hoveredInstanceId = ref(-1)
-// NEW: Lasso shape drawing state
+// Lasso shape drawing state
 const lassoShapePoints = ref<THREE.Vector3[]>([])
 const lassoShapeMesh = shallowRef<THREE.Mesh | null>(null)
 
@@ -78,6 +83,7 @@ attribute float instanceAspectRatio;
 attribute vec3 instancePosition;
 attribute vec4 instanceBorderColor;
 attribute float instanceGrayedOut;
+uniform float imageSizeFactor;
 varying vec2 vUV;
 varying float vHighlight;
 varying vec2 vDimensions;
@@ -85,13 +91,18 @@ varying float vInstanceGrayedOut;
 varying vec4 vInstanceUV;
 varying vec4 vInstanceBorderColor;
 void main() {
-    vUV = instanceUV.xy + instanceUV.zw * uv;
+    // UV mapping: instanceUV contains [u, v, width, height]
+    // We map the unit quad (0-1) to the correct position in the atlas
+    vUV = vec2(
+      instanceUV.x + instanceUV.z * uv.x,
+      instanceUV.y + instanceUV.w * (1.0 - uv.y)
+    );
     vHighlight = instanceHighlight;
     vInstanceGrayedOut = instanceGrayedOut;
     vInstanceUV = instanceUV;
     vInstanceBorderColor = instanceBorderColor;
-    float width = max(1.0, instanceAspectRatio);
-    float height = max(1.0, 1.0 / instanceAspectRatio);
+    float width = max(1.0, instanceAspectRatio) * imageSizeFactor;
+    float height = max(1.0, 1.0 / instanceAspectRatio) * imageSizeFactor;
     vDimensions = vec2(width, height);
     vec3 scaledPosition = position * vec3(width, height, 1.0);
     vec4 worldPosition = instanceMatrix * vec4(scaledPosition, 1.0);
@@ -110,11 +121,14 @@ varying vec4 vInstanceUV;
 varying vec4 vInstanceBorderColor;
 
 void main() {
-    float borderThickness = 0.02;
+    // Smaller images get proportionally thicker borders
+    float borderThickness = 0.03 * (2.0 / (vDimensions.x + vDimensions.y));
     
-    // Calculate instance-specific normalized UV coordinates
-    // This converts the global vUV back to a 0-1 range for each instance
-    vec2 instanceLocalUV = (vUV - vInstanceUV.xy) / vInstanceUV.zw;
+    // Calculate local UV coordinates for border detection
+    vec2 instanceLocalUV = vec2(
+        (vUV.x - vInstanceUV.x) / vInstanceUV.z,
+        (vUV.y - vInstanceUV.y) / vInstanceUV.w
+    );
     
     bool isBorder = 
         instanceLocalUV.x < borderThickness || 
@@ -168,6 +182,11 @@ function createInstancedMesh(
   let maxX = -Infinity
   let minY = Infinity
   let maxY = -Infinity
+  let maxImageArea = 0
+  atlasInfoArray.forEach((info) => {
+    const area = info.width * info.height
+    maxImageArea = Math.max(maxImageArea, area)
+  })
   if (useProjection) {
     projectionMap.forEach((coord) => {
       minX = Math.min(minX, coord.x)
@@ -179,26 +198,41 @@ function createInstancedMesh(
   const maxRange = useProjection ? Math.max(maxX - minX, maxY - minY) : 1
   const desiredScale = 50 // adjust as needed
 
+  // Texture dimensions for normalization
+  const textureWidth = atlasTexture.image.width
+  const textureHeight = atlasTexture.image.height
+
   for (let i = 0; i < count.value; i++) {
     const info = atlasInfoArray[i]
     const id = info.filename.toLowerCase().replace(/\.[^/.]+$/, '')
-    const uvX = info.x / atlasTexture.image.width
-    const uvWidth = info.width / atlasTexture.image.width
-    const uvHeight = info.height / atlasTexture.image.height
-    const uvH = -uvHeight
-    const uvY = info.y / atlasTexture.image.height - uvH
-    instanceUVs.set([uvX, uvY, uvWidth, uvH], i * 4)
 
+    // Fixed UV calculation
+    // UV is organized as [left, top, width, height]
+    const u = info.x / textureWidth
+    const v = info.y / textureHeight
+    const w = info.width / textureWidth
+    const h = info.height / textureHeight
+
+    instanceUVs.set([u, v, w, h], i * 4)
     instanceHighlights[i] = 0.0
     instanceAspectRatios[i] = info.width / info.height
 
-    const coords = projectionMap!.get(id)!
-    const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale
-    const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale
-    instancePositions[i * 3] = scaledX
-    instancePositions[i * 3 + 1] = scaledY
+    if (useProjection) {
+      const coords = projectionMap.get(id)
+      if (coords) {
+        const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale * spreadFactor.value
+        const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale * spreadFactor.value
 
-    instancePositions[i * 3 + 2] = 0
+        // Calculate Z-position based on image size (larger images go further back)
+        const imageArea = info.width * info.height
+        const normalizedSize = imageArea / maxImageArea
+        const zOffset = -normalizedSize * 0.3 + Math.random() * 0.01
+
+        instancePositions[i * 3] = scaledX
+        instancePositions[i * 3 + 1] = scaledY
+        instancePositions[i * 3 + 2] = zOffset
+      }
+    }
   }
 
   geometry.setAttribute('instanceUV', new THREE.InstancedBufferAttribute(instanceUVs, 4))
@@ -211,12 +245,15 @@ function createInstancedMesh(
   const material = new THREE.ShaderMaterial({
     uniforms: {
       map: { value: atlasTexture },
-      highlightColor: { value: new THREE.Color(0x0f08c9) },
+      highlightColor: { value: new THREE.Color(0x0F08C9) },
       highlightIntensity: { value: 0.5 },
+      imageSizeFactor: { value: imageSize.value },
     },
     vertexShader,
     fragmentShader,
     transparent: true,
+    alphaTest: 0.01,
+    depthWrite: false,
   })
 
   const instancedMesh = new THREE.InstancedMesh(geometry, material, count.value)
@@ -225,11 +262,128 @@ function createInstancedMesh(
     const x = instancePositions[i * 3]
     const y = instancePositions[i * 3 + 1]
     const z = instancePositions[i * 3 + 2]
-    matrix.makeTranslation(x, y, z)
+
+    // Incorporate image size in the matrix
+    matrix.compose(
+      new THREE.Vector3(x, y, z),
+      new THREE.Quaternion(),
+      new THREE.Vector3(1, 1, 1),
+    )
+
     instancedMesh.setMatrixAt(i, matrix)
   }
   instancedMesh.instanceMatrix.needsUpdate = true
+
+  // Apply force-directed repulsion
+  if (spreadFactor.value > 1.0) {
+    applyRepulsionForces(instancedMesh, 10)
+  }
+
   return instancedMesh
+}
+
+/**
+ * Apply force-directed repulsion to avoid overlapping instances
+ * @param mesh The instanced mesh
+ * @param iterations Number of iterations to run the algorithm
+ */
+function applyRepulsionForces(mesh = instancedMeshRef.value, iterations = 5) {
+  if (!mesh)
+    return
+
+  const instanceCount = mesh.count
+  const positions = []
+  const zValues = []
+  const sizes = []
+  const tempMatrix = new THREE.Matrix4()
+  const tempPosition = new THREE.Vector3()
+  const tempRotation = new THREE.Quaternion()
+  const tempScale = new THREE.Vector3()
+  const repFactor = (spreadFactor.value - 1) * repulsionStrength.value
+
+  if (repFactor <= 0)
+    return
+
+  // Extract current positions, scales, and calculate actual image sizes
+  const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
+  for (let i = 0; i < instanceCount; i++) {
+    mesh.getMatrixAt(i, tempMatrix)
+    tempMatrix.decompose(tempPosition, tempRotation, tempScale)
+    positions.push({ x: tempPosition.x, y: tempPosition.y })
+    zValues.push(tempPosition.z)
+    // Get the precise aspect ratio for this image
+    const aspectRatio = aspectRatios.getX(i)
+    const width = Math.max(1, aspectRatio) * imageSize.value
+    const height = Math.max(1, 1 / aspectRatio) * imageSize.value
+
+    // Store actual dimensions for overlap detection
+    sizes.push({ width, height })
+  }
+
+  // Run multiple iterations for stability
+  for (let iter = 0; iter < iterations; iter++) {
+    // For each pair of instances, calculate repulsion
+    for (let i = 0; i < instanceCount; i++) {
+      const forces = { x: 0, y: 0 }
+
+      for (let j = 0; j < instanceCount; j++) {
+        if (i === j)
+          continue
+
+        const posI = positions[i]
+        const posJ = positions[j]
+        const sizeI = sizes[i]
+        const sizeJ = sizes[j]
+
+        // Calculate distance between centers
+        const dx = posJ.x - posI.x
+        const dy = posJ.y - posI.y
+        const distanceSquared = dx * dx + dy * dy
+
+        // Calculate combined bounding box dimensions
+        const combinedWidth = (sizeI.width + sizeJ.width) / 2
+        const combinedHeight = (sizeI.height + sizeJ.height) / 2
+
+        // Skip if too far apart (optimization)
+        const maxDistanceToCheck = Math.max(combinedWidth, combinedHeight) * 2
+        if (distanceSquared > maxDistanceToCheck * maxDistanceToCheck)
+          continue
+
+        // Avoid division by zero
+        const distance = Math.max(0.1, Math.sqrt(distanceSquared))
+
+        // Calculate repulsion force - stronger when closer and when images overlap more
+        const overlapFactor = (sizeI.width * sizeI.height + sizeJ.width * sizeJ.height)
+          / (Math.min(sizeI.width, sizeJ.width) * Math.min(sizeI.height, sizeJ.height))
+        const force = repFactor * overlapFactor / (distance * distance)
+
+        // Apply force vector
+        forces.x -= (dx / distance) * force
+        forces.y -= (dy / distance) * force
+      }
+
+      // Apply accumulated forces with damping
+      const damping = 0.3
+      positions[i].x += forces.x * damping
+      positions[i].y += forces.y * damping
+    }
+  }
+
+  // Apply updated positions back to the mesh
+  for (let i = 0; i < instanceCount; i++) {
+    mesh.getMatrixAt(i, tempMatrix)
+    tempMatrix.decompose(tempPosition, tempRotation, tempScale)
+
+    tempMatrix.compose(
+      new THREE.Vector3(positions[i].x, positions[i].y, zValues[i]),
+      tempRotation,
+      tempScale,
+    )
+
+    mesh.setMatrixAt(i, tempMatrix)
+  }
+
+  mesh.instanceMatrix.needsUpdate = true
 }
 
 function updateInstancePositions(projectionData: { image: string, UMAP1: number, UMAP2: number }[]) {
@@ -259,23 +413,124 @@ function updateInstancePositions(projectionData: { image: string, UMAP1: number,
   const maxRange = Math.max(rangeX, rangeY)
   const desiredScale = 50
 
+  // Find largest image area for Z-ordering
+  let maxImageArea = 0
+  instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').array.forEach((aspectRatio: number) => {
+    // Approximate the area using aspect ratio (assuming normalized size of 1)
+    const width = Math.max(1, aspectRatio)
+    const height = Math.max(1, 1 / aspectRatio)
+    const area = width * height
+    maxImageArea = Math.max(maxImageArea, area)
+  })
+
   const matrix = new THREE.Matrix4()
+  const tempPosition = new THREE.Vector3()
+  const tempRotation = new THREE.Quaternion()
+  const tempScale = new THREE.Vector3()
   const instanceCount = instancedMeshRef.value.count
 
   for (let i = 0; i < instanceCount; i++) {
     const key = instanceToImageMap.value.get(i)
     if (!key)
       continue
+    // remove the file ending
+    const id = key.replace(/\.[^/.]+$/, '')
 
-    const coords = projectionMap.get(key.toLowerCase())
+    // Preserve the current scale by reading it from the existing matrix
+    instancedMeshRef.value.getMatrixAt(i, matrix)
+    matrix.decompose(tempPosition, tempRotation, tempScale)
+
+    const coords = projectionMap.get(id.toLowerCase())
     if (coords) {
-      const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale
-      const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale
-      matrix.makeTranslation(scaledX + props.offsetX, scaledY, 0)
+      const scaledX = ((coords.x - minX) / maxRange - 0.5) * desiredScale * spreadFactor.value
+      const scaledY = ((coords.y - minY) / maxRange - 0.5) * desiredScale * spreadFactor.value
+
+      // Get the aspect ratio to calculate approximate area
+      const aspectRatio = instancedMeshRef.value.geometry.getAttribute('instanceAspectRatio').getX(i)
+
+      // For Z-ordering
+      const width = Math.max(1, aspectRatio)
+      const height = Math.max(1, 1 / aspectRatio)
+      const area = width * height
+      const normalizedSize = area / maxImageArea
+      const zOffset = -normalizedSize * 0.3
+
+      // Use the existing scale values from tempScale instead of calculating new ones
+      matrix.compose(
+        new THREE.Vector3(scaledX + props.offsetX, scaledY, zOffset),
+        tempRotation,
+        tempScale,
+      )
+
       instancedMeshRef.value.setMatrixAt(i, matrix)
     }
   }
   instancedMeshRef.value.instanceMatrix.needsUpdate = true
+
+  // Apply force-directed repulsion if spread factor > 1
+  if (spreadFactor.value > 1.0) {
+    applyRepulsionForces(instancedMeshRef.value, 10)
+  }
+}
+
+function updateSpread() {
+  // Store current image sizes before updating positions
+  const tempScales = []
+
+  if (instancedMeshRef.value) {
+    const matrix = new THREE.Matrix4()
+    const tempPosition = new THREE.Vector3()
+    const tempRotation = new THREE.Quaternion()
+    const tempScale = new THREE.Vector3()
+
+    // Store all current scales
+    for (let i = 0; i < instancedMeshRef.value.count; i++) {
+      instancedMeshRef.value.getMatrixAt(i, matrix)
+      matrix.decompose(tempPosition, tempRotation, tempScale)
+      tempScales.push(tempScale.clone())
+    }
+  }
+
+  // Update positions
+  if (currentProjectionData.value.length > 0) {
+    updateInstancePositions(currentProjectionData.value)
+  }
+
+  // Restore scales if needed
+  if (instancedMeshRef.value && tempScales.length === instancedMeshRef.value.count) {
+    const matrix = new THREE.Matrix4()
+    const tempPosition = new THREE.Vector3()
+    const tempRotation = new THREE.Quaternion()
+    const tempScale = new THREE.Vector3()
+
+    for (let i = 0; i < instancedMeshRef.value.count; i++) {
+      instancedMeshRef.value.getMatrixAt(i, matrix)
+      matrix.decompose(tempPosition, tempRotation, tempScale)
+
+      // Create new matrix with original position but preserved scale
+      matrix.compose(
+        tempPosition,
+        tempRotation,
+        tempScales[i],
+      )
+
+      instancedMeshRef.value.setMatrixAt(i, matrix)
+    }
+
+    instancedMeshRef.value.instanceMatrix.needsUpdate = true
+  }
+}
+
+function initializeRendering() {
+  if (instancedMeshRef.value) {
+    // Force material to update all properties
+    instancedMeshRef.value.material.needsUpdate = true
+
+    // Force a single render frame
+    if (rendererRef.value && cameraRef.value && sceneRef.value) {
+      rendererRef.value.render(sceneRef.value, cameraRef.value)
+    }
+  }
 }
 
 // ----- Controls Setup -----
@@ -296,7 +551,7 @@ function setupControls(camera: THREE.Camera, rendererElement: HTMLElement): Arcb
   controls.cursorZoom = true
   controls.enableRotate = false
   controls.minDistance = 1
-  controls.maxDistance = 100
+  controls.maxDistance = 1000
   controls.enablePan = true
   controls.panSpeed = 0.5
   controls.setGizmosVisible(false)
@@ -347,7 +602,6 @@ function updateHoveredMesh(
       console.warn('Scene is null, skipping lasso raycasting')
       return
     }
-    console.time('Lasso Total Time')
     const lassoPolygon = lassoShapePoints.value.map((pt) => {
       const projected = pt.clone().project(cameraRef.value!)
       return {
@@ -382,14 +636,6 @@ function updateHoveredMesh(
       imageStore.clearSelection()
     }
     imageStore.batchSelect(selectedKeys)
-    allMeshes.forEach((mesh) => {
-      for (let instanceId = 0; instanceId < mesh.count; instanceId++) {
-        const key = instanceToImageMap.value.get(instanceId)
-        const highlight = (key && imageStore.selectedIds.has(key)) ? 1 : 0
-        setInstanceHighlight(mesh, instanceId, highlight)
-      }
-    })
-    console.timeEnd('Lasso Total Time')
   }
   else {
     const hitResult = findHoveredInstance()
@@ -444,7 +690,6 @@ function updateHoveredMesh(
           break
         }
         case 'right-click':
-          console.log('Right-click interaction detected')
           break
       }
     }
@@ -452,15 +697,33 @@ function updateHoveredMesh(
 }
 
 function resetFocus() {
+  // Get the currently focused image ID first
+  const focusedId = imageStore.focusedId
+
+  // If there is a focused image, find and unhighlight it directly
+  if (focusedId && instancedMeshRef.value) {
+    const instanceId = imageToInstanceMap.value.get(focusedId)
+    if (instanceId !== undefined) {
+      // Only reset highlight if it's not in the selected set
+      if (!imageStore.selectedIds.has(focusedId)) {
+        setInstanceHighlight(instancedMeshRef.value, instanceId, 0)
+      }
+    }
+  }
+
   // Clear focus in the store
   imageStore.unlockImageFocus()
 
-  // Clear highlight on the previously focused instance
+  // Also clear highlight on the previously hovered instance if different from focused
   if (lastHovered.index !== -1 && lastHovered.mesh) {
     const key = instanceToImageMap.value.get(lastHovered.index)
-    if (!key || !imageStore.selectedIds.has(key)) {
+    const isFocusedImage = key === focusedId
+
+    // Only clear if it's not the same as the focused image we just cleared
+    if (!isFocusedImage && (!key || !imageStore.selectedIds.has(key))) {
       setInstanceHighlight(lastHovered.mesh, lastHovered.index, 0)
     }
+
     lastHovered.index = -1
     lastHovered.mesh = null
   }
@@ -564,24 +827,25 @@ function handleMouseUp(event: MouseEvent) {
         // If ctrl is pressed, handle selection toggling
         if (event.ctrlKey) {
           imageStore.toggleSelection(key)
-          if (hitResult.mesh) {
-            setInstanceHighlight(
-              hitResult.mesh,
-              hitResult.instanceId,
-              imageStore.selectedIds.has(key) ? 1 : 0,
-            )
-          }
         }
         else {
+          // If another image is already locked, reset focus first
+          if (imageStore.isImageFocusLocked && imageStore.focusedId !== key) {
+            resetFocus()
+          }
+
           // Lock focus on clicked image
           imageStore.lockImageFocus(key)
 
-          if (hitResult.mesh) {
-            setInstanceHighlight(hitResult.mesh, hitResult.instanceId, 1)
-          }
-
           // Emit the focused image key for display
           emit('imageFocusChange', key)
+
+          // Make sure the clicked image is highlighted
+          setInstanceHighlight(hitResult.mesh, hitResult.instanceId, 1)
+
+          // Update lastHovered to the new focused image
+          lastHovered.index = hitResult.instanceId
+          lastHovered.mesh = hitResult.mesh
 
           // Open detail window if not already open
           if (!imageStore.isDetailWindowOpen()) {
@@ -621,7 +885,7 @@ function findHoveredInstance() {
       const mesh = obj
       const instanceCount = mesh.count
       const matrix = new THREE.Matrix4()
-      const aspectRatios = mesh.geometry.attributes.instanceAspectRatio
+      const aspectRatios = mesh.geometry.getAttribute('instanceAspectRatio')
 
       for (let instanceId = 0; instanceId < instanceCount; instanceId++) {
         mesh.getMatrixAt(instanceId, matrix)
@@ -631,8 +895,9 @@ function findHoveredInstance() {
           continue
 
         const aspectRatio = aspectRatios.getX(instanceId)
-        const width = Math.max(1, aspectRatio) * instanceScale.x
-        const height = Math.max(1, 1 / aspectRatio) * instanceScale.y
+        // Calculate accurate width and height for this instance
+        const width = Math.max(1, aspectRatio) * imageSize.value
+        const height = Math.max(1, 1 / aspectRatio) * imageSize.value
 
         boundingBox.setFromCenterAndSize(
           instancePosition,
@@ -678,11 +943,6 @@ function findHoveredInstance() {
 }
 
 // ----- Main onMounted Block -----
-onBeforeMount(async () => {
-  await imageStore.loadImageMetadata()
-  await imageStore.loadProjections()
-})
-
 onMounted(async () => {
   if (imageStore.images.size === 0) {
     await imageStore.loadImageMetadata()
@@ -708,7 +968,7 @@ onMounted(async () => {
   }
   sceneRef.value = new THREE.Scene()
   sceneRef.value.background = backgroundColor.value
-  const camera = new THREE.PerspectiveCamera(75, props.width / props.height, 0.1, 1000)
+  const camera = new THREE.PerspectiveCamera(75, props.width / props.height, 0.1, 10000)
   camera.position.z = 50
   cameraRef.value = camera
   const renderer = new THREE.WebGLRenderer({ canvas: canvas.value, antialias: true })
@@ -739,6 +999,7 @@ onMounted(async () => {
       '/data/atlas.png',
       async (texture) => {
         texture.flipY = false
+
         // If a current projection is set, try to fetch its data to build a projection map.
         let projectionMap: Map<string, { x: number, y: number }> | undefined
         if (imageStore.currentProjection) {
@@ -746,6 +1007,7 @@ onMounted(async () => {
             const projResponse = await fetch(`/data/projections/${imageStore.currentProjection}`)
             if (projResponse.ok) {
               const projectionData = await projResponse.json()
+              currentProjectionData.value = projectionData
               projectionMap = new Map<string, { x: number, y: number }>()
               projectionData.forEach((item: { image: string, UMAP1: number, UMAP2: number }) => {
                 projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
@@ -759,10 +1021,19 @@ onMounted(async () => {
             console.error('Error fetching projection data:', error)
           }
         }
+
         // Create the instanced mesh using the projection map if available.
         const instancedMesh = createInstancedMesh(texture, atlasData, projectionMap)
         instancedMeshRef.value = instancedMesh
         sceneRef.value.add(instancedMesh)
+
+        initializeRendering()
+
+        // Only update positions if we have projection data
+        if (currentProjectionData.value.length > 0) {
+          updateInstancePositions(currentProjectionData.value)
+        }
+
         // Start animation loop.
         animate()
       },
@@ -797,13 +1068,12 @@ watch(
   async (newProjFile) => {
     if (newProjFile) {
       try {
-        // pause here for 2 seconds
-        await new Promise(resolve => setTimeout(resolve, 4000))
         const response = await fetch(`/data/projections/${newProjFile}`)
         if (!response.ok)
           throw new Error('Failed to fetch projection data.')
         const projectionData = await response.json()
-        updateInstancePositions(projectionData)
+        currentProjectionData.value = projectionData
+        updateInstancePositions(currentProjectionData.value)
         // Call animate() to ensure the scene updates.
         animate()
       }
@@ -817,7 +1087,17 @@ watch(
 watch(backgroundColor, (color) => {
   sceneRef.value!.background = color
 })
-// filter updates
+
+watch([spreadFactor, repulsionStrength], () => {
+  updateSpread()
+})
+
+watch(imageSize, () => {
+  if (instancedMeshRef.value && instancedMeshRef.value.material) {
+    (instancedMeshRef.value.material as THREE.ShaderMaterial).uniforms.imageSizeFactor.value = imageSize.value
+  }
+})
+
 // filter updates
 watch(() => imageStore.filteredImageIds, (filteredIds) => {
   const instanceCount = instancedMeshRef.value?.count
@@ -907,7 +1187,118 @@ defineExpose({
 </script>
 
 <template>
-  <canvas ref="canvas" />
+  <div class="relative h-full w-full">
+    <canvas ref="canvas" />
+
+    <!-- Collapsible Controls panel -->
+    <div
+      class="absolute right-6 top-6 z-10 rounded bg-gray-100 shadow-lg transition-all duration-300 dark:bg-gray-800"
+      :class="[
+        isControlsOpen ? 'w-64 p-4' : 'w-10 p-2',
+      ]"
+    >
+      <!-- Toggle button -->
+      <button
+        class="absolute top-2 h-8 w-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-700 shadow-md -left-6 dark:bg-gray-700 hover:bg-gray-300 dark:text-gray-200 dark:hover:bg-gray-600"
+        :title="isControlsOpen ? 'Collapse controls' : 'Expand controls'"
+        @click="isControlsOpen = !isControlsOpen"
+      >
+        <v-icon
+          :icon="isControlsOpen ? 'mdi-chevron-right' : 'mdi-chevron-left'"
+          size="large"
+        />
+      </button>
+
+      <!-- Panel content - shown when open -->
+      <div v-if="isControlsOpen">
+        <h3 class="mb-2 text-sm font-medium">
+          Layout Controls
+        </h3>
+
+        <!-- Global spread slider -->
+        <div class="mb-4">
+          <div class="mb-1 flex items-center justify-between">
+            <span class="text-sm">Global Spread</span>
+          </div>
+          <v-slider
+            v-model="spreadFactor"
+            :min="1"
+            :max="6"
+            :step="0.1"
+            density="compact"
+            color="primary"
+            hide-details
+            thumb-label
+          />
+          <div class="mt-1 flex justify-between text-xs">
+            <span>Compact</span>
+            <span>Spread</span>
+          </div>
+        </div>
+
+        <!-- Repulsion strength slider -->
+        <div>
+          <div class="mb-1 flex items-center justify-between">
+            <span class="text-sm">Repulsion Force</span>
+          </div>
+          <v-slider
+            v-model="repulsionStrength"
+            :min="0"
+            :max="6"
+            :step="0.1"
+            density="compact"
+            color="secondary"
+            hide-details
+            thumb-label
+          />
+          <div class="mt-1 flex justify-between text-xs">
+            <span>Weak</span>
+            <span>Strong</span>
+          </div>
+          <v-divider class="my-2" />
+        </div>
+
+        <!-- Image Size slider -->
+        <div class="mb-4">
+          <div class="mb-1 flex items-center justify-between">
+            <span class="text-sm">Image Size</span>
+          </div>
+          <v-slider
+            v-model="imageSize"
+            :min="0.5"
+            :max="6"
+            :step="0.1"
+            density="compact"
+            color="success"
+            hide-details
+            thumb-label
+          />
+          <div class="mt-1 flex justify-between text-xs">
+            <span>Small</span>
+            <span>Large</span>
+          </div>
+        </div>
+
+        <div class="mt-3 text-xs">
+          <p><strong>- Global Spread</strong> to scale all images</p>
+          <p><strong>- Repulsion Force</strong> for local overplotting</p>
+          <p><strong>- Image Size</strong> to control detail visibility</p>
+        </div>
+      </div>
+
+      <!-- Collapsed state - vertical text -->
+      <div
+        v-else
+        class="h-full w-full flex flex-col cursor-pointer items-center justify-center"
+        title="Click to expand controls"
+        @click="isControlsOpen = true"
+      >
+        <div class="vertical-text text-xs font-medium">
+          Controls
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -915,5 +1306,11 @@ canvas {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.vertical-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
 }
 </style>

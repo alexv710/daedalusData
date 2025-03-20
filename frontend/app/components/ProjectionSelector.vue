@@ -18,14 +18,13 @@ function onSelect(value: string) {
 
 <template>
   <v-card outlined class="ma-0 pa-0" style="max-width:600px; margin:auto;">
-    <v-card-title class="justify-space-between align-center text-h6">
+    <v-card-title class="text-h6 justify-space-between align-center">
       <span>Projection</span>
     </v-card-title>
     <v-card-text class="ma-0 pa-1">
       <v-select
         v-model="selectedProjection"
-        dense
-        hide-details
+        hide-details dense
         label="Select Projection"
         :items="imageStore.availableProjections"
         class="ma-0 pa-0"

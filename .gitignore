@@ -2,17 +2,13 @@
 data/*
 !data/.gitkeep
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
 # Python
 __pycache__/
 *.py[cod]
 .env
 .venv
 venv/
+.safety-project.ini
 
 # Node
 node_modules/
@@ -20,6 +16,7 @@ node_modules/
 .output/
 dist/
 *.pnpm-store/
+frontend/app/coverage/
 
 # IDE
 *.vscode/

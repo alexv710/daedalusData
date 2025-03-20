@@ -6,7 +6,11 @@ DaedalusData is an open-source platform for the exploration, visualization, and 
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-![DaedalusData Screenshot](docs/screenshot1.png)
+![DaedalusData Screenshot](docs/analysis-page.png)
+
+<br>
+
+![Data Preparation](docs/index-page.gif)
 
 ## Features
 
@@ -32,7 +36,6 @@ DaedalusData/
 │   ├── features/     # Extracted features (CSV/NPZ)
 │   ├── projections/  # Dimensionality reduction results
 │   └── labels/       # Label alphabets and assignments
-└── backend/          # Supporting backend utilities
 ```
 
 ## Getting Started
@@ -54,7 +57,7 @@ That's it! Everything else runs inside Docker, so you don't need to worry about 
 
 2. Start the application:
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 3. Access the application:
@@ -70,7 +73,7 @@ That's it! You now have a fully functional image exploration and labeling system
 
 ### Configuration
 
-The application is configured through the `docker-compose.yml` file. Key configuration options:
+The application is configured through the `compose.yaml` file. Key configuration options:
 
 - `JUPYTER_TOKEN`: Authentication token for Jupyter (default: `daedalus-dev`)
 - Volume mounts for data directories
