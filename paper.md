@@ -13,9 +13,7 @@ tags:
 authors:
   - name: Alexander Wyss
     orcid: 0009-0009-2763-3186
-    affiliation:
-      - "1"
-      - "2"
+    affiliation: "1, 2"
 affiliations:
   - name: Independent Researcher
     index: 1
