@@ -11,6 +11,7 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     'vuetify-nuxt-module',
   ],
+  ssr: true,
 
   devtools: {
     enabled: true,
@@ -93,6 +94,5 @@ export default defineNuxtConfig({
       },
     },
   },
-
   pwa,
 })
