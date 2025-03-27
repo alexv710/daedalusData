@@ -23,6 +23,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const atlasExists = ref(false)
 const activeStep = ref(0)
+const atlasFilename = 'atlas.png'
 const steps = [
   { name: 'Images', completed: false, icon: 'mdi-image-multiple', tooltip: 'Add images to your dataset' },
   { name: 'Metadata', completed: false, icon: 'mdi-file-document-outline', tooltip: 'Add metadata for your images' },
@@ -69,7 +70,7 @@ function checkStepStatus() {
 
 function checkAtlasExists() {
   // Perform a HEAD request to check for the atlas file
-  fetch('/data/atlas.png', {
+  fetch(`api/file/${atlasFilename}`, {
     method: 'HEAD',
     // Add cache-busting to ensure we're not getting cached responses
     headers: { 'Cache-Control': 'no-cache' },
@@ -78,7 +79,7 @@ function checkAtlasExists() {
       atlasExists.value = res.ok
       if (res.ok) {
         // Also check for atlas.json to ensure the metadata exists
-        return fetch('/data/atlas.json', {
+        return fetch('api/file/atlas.json', {
           method: 'HEAD',
           headers: { 'Cache-Control': 'no-cache' },
         })
@@ -332,12 +333,12 @@ onUnmounted(() => {
 
                     <div class="grid grid-cols-2 mt-4 gap-4 lg:grid-cols-6 md:grid-cols-4">
                       <div
-                        v-for="image in dataset.images.slice(0, 6)"
+                        v-for="image in dataset.images.slice(0, 12)"
                         :key="image.name"
                         class="aspect-square border rounded-lg p-2 transition-shadow hover:shadow-lg"
                       >
                         <img
-                          :src="`data/images/${image.name}`"
+                          :src="`/api/file/images/${image.name}`"
                           :alt="image.name"
                           class="h-full w-full object-contain"
                         >
@@ -565,7 +566,7 @@ onUnmounted(() => {
                       </h3>
                       <img
                         v-if="atlasExists"
-                        :src="`/data/atlas.png?t=${Date.now()}`"
+                        :src="`/api/file/${atlasFilename}`"
                         alt="Atlas"
                         class="h-64 w-full border rounded object-contain"
                       >

@@ -33,16 +33,35 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Debug log
-    const dirPath = path.join('/app/data', type)
-    console.info('Attempting to read directory:', dirPath)
+    // Define possible base directories to check
+    // neither elegant nor efficient but allows for now to work in local dev with pnpm dev
+    // using docker, or also singularity on HPC
+    const basePaths = [
+      path.join(process.cwd(), 'app/data'),
+      path.join(process.cwd(), 'data'),
+      path.join(process.cwd(), '../data'),
+    ]
 
-    // Make sure the directory exists, if not create it
-    try {
-      await fs.access(dirPath)
+    let dirPath: string | null = null
+    for (const base of basePaths) {
+      const candidate = path.join(base, type)
+      try {
+        console.info('Attempting to read directory:', candidate)
+        await fs.access(candidate)
+        dirPath = candidate
+        console.info(`Directory found at: ${candidate}`)
+        break
+      }
+      catch (error) {
+        console.info(`Directory ${candidate} not accessible:`, error)
+        // Try the next base path
+      }
     }
-    catch (error) {
-      console.info(`Creating directory ${dirPath} as it doesn't exist yet, error:`, error)
+
+    // If no existing directory was found, create it at the first path
+    if (!dirPath) {
+      dirPath = path.join(basePaths[0], type)
+      console.info(`Creating directory ${dirPath} as it doesn't exist yet`)
       await fs.mkdir(dirPath, { recursive: true })
     }
 

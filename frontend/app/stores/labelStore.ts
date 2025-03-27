@@ -66,7 +66,7 @@ export const useLabelStore = defineStore('labels', () => {
   // --- Loading Actions ---
   async function loadManifest() {
     try {
-      const response = await fetch('/data/labels/label_manifest.json')
+      const response = await fetch('api/file/labels/label_manifest.json')
       if (!response.ok) {
         throw new Error('Failed to load label manifest, please create a new alphabet first.')
       }
@@ -83,7 +83,7 @@ export const useLabelStore = defineStore('labels', () => {
     alphabets.value = []
     for (const filename of manifest.value) {
       try {
-        const response = await fetch(`/data/labels/${filename}`)
+        const response = await fetch(`api/file/labels/${filename}`)
         if (!response.ok) {
           throw new Error(`Failed to load ${filename}`)
         }

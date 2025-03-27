@@ -68,15 +68,6 @@ export default defineNuxtConfig({
         target: 'esnext',
       },
     },
-    prerender: {
-      crawlLinks: false,
-      routes: ['/'],
-      ignore: ['/hi'],
-    },
-    static: {
-      dir: '/app/data',
-      prefix: '/data/',
-    },
     publicAssets: [
       {
         dir: '/app/data',

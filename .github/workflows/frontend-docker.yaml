@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Free up disk space
         run: |
@@ -35,6 +37,25 @@ jobs:
           sudo apt-get clean
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h
+
+      - name: Get version from package.json
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "VERSION=pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            VERSION=$(cd frontend && node -p "require('./package.json').version")
+            if [[ -z "$VERSION" || "$VERSION" == "undefined" || "$VERSION" == "null" ]]; then
+              VERSION=$(git describe --tags --always)
+              if [[ -z "$VERSION" ]]; then
+                VERSION="${{ github.ref_name }}-$(git rev-parse --short HEAD)"
+              fi
+            fi
+            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${{ github.ref_name }}-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+          echo "Determined version: $(cat $GITHUB_OUTPUT | grep VERSION | cut -d= -f2)"
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -52,10 +73,10 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}/frontend
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,format=short
+            type=raw,value=${{ steps.version.outputs.VERSION }}
+            type=raw,value=${{ github.ref_name }}
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+            type=sha,format=short
 
       - name: Build and push Nuxt Docker image
         uses: docker/build-push-action@v5
@@ -69,6 +90,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend-pnpm
           build-args: |
             NODE_ENV=production
+            APP_VERSION=${{ steps.version.outputs.VERSION }}
           platforms: linux/amd64
 
       - name: Test the built Nuxt image
@@ -98,7 +120,7 @@ jobs:
           docker stop $CONTAINER_ID
           
       - name: Output Image URI
-        if: github.event_name != 'pull_request'
         run: |
           echo "The Nuxt frontend Docker image has been pushed to:"
           echo "${{ steps.meta.outputs.tags }}"
+          echo "With version: ${{ steps.version.outputs.VERSION }}"
