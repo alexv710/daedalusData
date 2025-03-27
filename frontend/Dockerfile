@@ -10,7 +10,10 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
 COPY . .
 
 # Force SSR mode with explicit environment variables
-ENV NODE_ENV=production
+ARG NODE_ENV=production
+ARG APP_VERSION=unknown
+ENV NODE_ENV=${NODE_ENV}
+ENV NUXT_APP_VERSION=${APP_VERSION}
 ENV NUXT_SSR=true
 ENV NITRO_PRESET=node-server
 
