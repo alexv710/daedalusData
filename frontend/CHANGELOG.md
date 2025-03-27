@@ -1,3 +1,14 @@
+## [1.0.0-dev.5](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.4...v1.0.0-dev.5) (2025-03-27)
+
+### Features
+
+* decouple atlas generation from metadata existance ([15f68ff](https://github.com/alexv710/daedalusData/commit/15f68ff5e94e1534eb514c989fb70a57e449ac6f))
+* fetch all files via a server route ([e1b74a5](https://github.com/alexv710/daedalusData/commit/e1b74a52129abc1ce66feb8d687986b2e08115d6))
+
+### Bug Fixes
+
+* ignore the semantic versioning commits in the commitlint and lint js ([6d07687](https://github.com/alexv710/daedalusData/commit/6d07687633c2e0bef5ce0db852afffc8cf9aaeb2))
+
 ## [1.0.0-dev.5](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.4...v1.0.0-dev.5) (2025-03-25)
 
 ### Bug Fixes
