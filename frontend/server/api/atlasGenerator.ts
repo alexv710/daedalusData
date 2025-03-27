@@ -40,49 +40,68 @@ async function generateAtlas(): Promise<{
   // Start tracking progress
   await updateStatus(5, 'Initializing atlas generation...')
 
-  const dataDir = path.join(process.cwd(), '..', 'data')
+  // Try multiple paths to find the data directory
+  let dataDir
+  const basePaths = [
+    path.join(process.cwd(), '/app/data'),
+    path.join(process.cwd(), '/data'),
+    path.join(process.cwd(), '../data'),
+  ]
+
+  for (const potentialPath of basePaths) {
+    try {
+      await fs.promises.access(potentialPath)
+      dataDir = potentialPath
+      console.info(`Found accessible data directory at: ${dataDir}`)
+      break
+    }
+    catch (error) {
+      console.info(`Directory ${potentialPath} not accessible: ${error.message}`)
+    }
+  }
+
+  if (!dataDir) {
+    console.error('Could not find an accessible data directory')
+  }
+
   console.info('Using data directory:', dataDir)
   console.info('Files in the data directory:', fs.readdirSync(dataDir))
 
-  const metadataDir = path.join(dataDir, 'metadata')
-  if (!fs.existsSync(metadataDir)) {
-    console.warn('Metadata directory not found, creating it.')
-    fs.mkdirSync(metadataDir, { recursive: true })
-  }
-  console.info('Files in the metadata directory:', fs.readdirSync(metadataDir))
-
-  await updateStatus(10, 'Reading image metadata...')
-  const metadataPath = path.join(dataDir, 'metadata', 'images.json')
-  console.info('Looking for image metadata JSON at:', metadataPath)
-  if (!fs.existsSync(metadataPath)) {
-    console.error('Image metadata JSON not found at', metadataPath)
-    await updateStatus(0, 'Image metadata JSON not found', 'error')
-    throw new Error('Image metadata JSON not found')
-  }
-  const rawMetadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'))
-
-  let images: ImageMeta[] = []
-  if (Array.isArray(rawMetadata)) {
-    images = rawMetadata
-  }
-  else {
-    images = Object.entries(rawMetadata).map(([key, data]) => ({
-      filename: `${key}.png`,
-      ...data,
-    }))
-  }
-  if (!images.length) {
-    console.error('No images found in the JSON metadata.')
-    await updateStatus(0, 'No images found in the JSON metadata', 'error')
-    throw new Error('No images found in the JSON metadata')
+  // Set up the images directory path.
+  const imagesDir = path.join(dataDir, 'images')
+  if (!fs.existsSync(imagesDir)) {
+    console.error('Images directory not found at', imagesDir)
+    await updateStatus(0, 'Images directory not found', 'error')
+    throw new Error('Images directory not found')
   }
 
-  await updateStatus(15, `Found ${images.length} images in metadata. Reading image dimensions...`)
+  // Update progress and read image files from the images directory.
+  await updateStatus(10, 'Reading image files from images directory...')
+  // Define allowed image extensions.
+  const allowedExtensions = ['.png', '.jpg', '.jpeg']
+  const imageFiles = fs.readdirSync(imagesDir)
+    .filter(file => allowedExtensions.includes(path.extname(file).toLowerCase()))
+  if (!imageFiles.length) {
+    console.error('No image files found in the images directory.')
+    await updateStatus(0, 'No image files found', 'error')
+    throw new Error('No image files found')
+  }
+
+  // Create an array of ImageMeta objects from the list of filenames.
+  let images: ImageMeta[] = imageFiles.map(file => ({
+    filename: file,
+    width: 0,
+    height: 0,
+    originalWidth: 0,
+    originalHeight: 0,
+  }))
+
+  await updateStatus(15, `Found ${images.length} images. Reading image dimensions...`)
 
   let processedCount = 0
   images = await Promise.all(
     images.map(async (img) => {
-      const imgPath = path.join(dataDir, 'images', img.filename)
+      const imgPath = path.join(imagesDir, img.filename)
       if (!fs.existsSync(imgPath)) {
         console.warn(`File not found: ${imgPath}`)
         return null
@@ -189,7 +208,7 @@ async function generateAtlas(): Promise<{
     await updateStatus(batchProgress, `Processing images batch ${batchIndex + 1}/${batches} (${startIdx} to ${endIdx})...`)
     const batchComposites = await Promise.all(
       batchImages.map(async (img) => {
-        const imgPath = path.join(dataDir, 'images', img.filename)
+        const imgPath = path.join(imagesDir, img.filename)
         if (!fs.existsSync(imgPath)) {
           console.warn(`File not found: ${imgPath}`)
           return null
