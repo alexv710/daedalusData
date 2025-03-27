@@ -99,7 +99,7 @@ async function findCorrectImageExtension() {
       }
     }
     catch (error) {
-      console.info(`Image not found with extension: ${ext}`)
+      console.info(`Image not found with extension: ${ext}, ${error}`)
     }
   }
 

@@ -23,6 +23,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const atlasExists = ref(false)
 const activeStep = ref(0)
+const atlasFilename = 'atlas.png'
 const steps = [
   { name: 'Images', completed: false, icon: 'mdi-image-multiple', tooltip: 'Add images to your dataset' },
   { name: 'Metadata', completed: false, icon: 'mdi-file-document-outline', tooltip: 'Add metadata for your images' },
@@ -69,7 +70,7 @@ function checkStepStatus() {
 
 function checkAtlasExists() {
   // Perform a HEAD request to check for the atlas file
-  fetch('api/file/atlas.png', {
+  fetch(`api/file/${atlasFilename}`, {
     method: 'HEAD',
     // Add cache-busting to ensure we're not getting cached responses
     headers: { 'Cache-Control': 'no-cache' },
@@ -565,7 +566,7 @@ onUnmounted(() => {
                       </h3>
                       <img
                         v-if="atlasExists"
-                        :src="`/api/file/atlas.png`"
+                        :src="`/api/file/${atlasFilename}`"
                         alt="Atlas"
                         class="h-64 w-full border rounded object-contain"
                       >
