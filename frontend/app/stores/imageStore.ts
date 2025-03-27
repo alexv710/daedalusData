@@ -23,14 +23,14 @@ export const useImageStore = defineStore('image', () => {
   async function loadImageMetadata() {
     try {
     // First, fetch the atlas data to get the list of valid images
-      const atlasResponse = await fetch('/data/atlas.json')
+      const atlasResponse = await fetch('api/file/atlas.json')
       if (!atlasResponse.ok) {
         throw new Error('Failed to fetch atlas data')
       }
       const atlasData = await atlasResponse.json()
 
       // Then, fetch the metadata
-      const metadataResponse = await fetch('/data/metadata/images.json')
+      const metadataResponse = await fetch('api/file/metadata/images.json')
       if (!metadataResponse.ok) {
         throw new Error('Failed to fetch image metadata')
       }
@@ -585,7 +585,7 @@ export const useImageStore = defineStore('image', () => {
   // Load available projection file names from the manifest.
   async function loadProjections() {
     try {
-      const response = await fetch('/data/projections/projection_manifest.json')
+      const response = await fetch('api/file/projections/projection_manifest.json')
       if (!response.ok) {
         throw new Error('Failed to fetch projection manifest.')
       }

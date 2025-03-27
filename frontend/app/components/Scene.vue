@@ -990,13 +990,13 @@ onMounted(async () => {
 
   const controls = setupControls(camera, renderer.domElement, sceneRef.value)
   try {
-    const response = await fetch('/data/atlas.json')
+    const response = await fetch('api/file/atlas.json')
     if (!response.ok)
       throw new Error('Failed to fetch atlas.json')
     const atlasData = await response.json()
     const textureLoader = new THREE.TextureLoader()
     textureLoader.load(
-      '/data/atlas.png',
+      'api/file/atlas.png',
       async (texture) => {
         texture.flipY = false
 
@@ -1004,7 +1004,7 @@ onMounted(async () => {
         let projectionMap: Map<string, { x: number, y: number }> | undefined
         if (imageStore.currentProjection) {
           try {
-            const projResponse = await fetch(`/data/projections/${imageStore.currentProjection}`)
+            const projResponse = await fetch(`api/file/projections/${imageStore.currentProjection}`)
             if (projResponse.ok) {
               const projectionData = await projResponse.json()
               currentProjectionData.value = projectionData
@@ -1068,7 +1068,7 @@ watch(
   async (newProjFile) => {
     if (newProjFile) {
       try {
-        const response = await fetch(`/data/projections/${newProjFile}`)
+        const response = await fetch(`api/file/projections/${newProjFile}`)
         if (!response.ok)
           throw new Error('Failed to fetch projection data.')
         const projectionData = await response.json()
