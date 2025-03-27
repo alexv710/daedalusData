@@ -1,5 +1,6 @@
 // Import mocked modules
 import fs from 'node:fs/promises'
+import path from 'node:path'
 
 import { createEvent } from 'h3'
 
@@ -7,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // Use the Nuxt alias for importing the handler
 import handler from './[type].get'
 
-// Mock the fs and path modules
+// Mock the fs module
 vi.mock('node:fs/promises', () => ({
   default: {
     readdir: vi.fn(),
@@ -17,15 +18,19 @@ vi.mock('node:fs/promises', () => ({
   },
 }))
 
+// Mock the path module with a more complete implementation
 vi.mock('node:path', () => ({
   default: {
-    join: vi.fn((dir, type) => `/app/data/${type}`),
+    join: vi.fn((...args) => args.join('/')),
   },
 }))
 
 describe('files/[type].get route handler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
+    // Default mock for cwd
+    vi.spyOn(process, 'cwd').mockReturnValue('/current/working/dir')
 
     // Default mock for console methods
     vi.spyOn(console, 'info').mockImplementation(() => {})
@@ -59,9 +64,9 @@ describe('files/[type].get route handler', () => {
     expect(response.validTypes).toContain('projections')
   })
 
-  it('should create directory if it does not exist', async () => {
-    // Mock fs.access to throw error
-    vi.mocked(fs.access).mockRejectedValueOnce(new Error('Directory not found'))
+  it('should try all base paths and create directory if none exist', async () => {
+    // Mock fs.access to throw error for all paths
+    vi.mocked(fs.access).mockRejectedValue(new Error('Directory not found'))
 
     // Mock successful directory creation
     vi.mocked(fs.mkdir).mockResolvedValueOnce(undefined)
@@ -81,8 +86,49 @@ describe('files/[type].get route handler', () => {
     // Call the handler
     const response = await handler(event)
 
-    // Verify mkdir was called
-    expect(fs.mkdir).toHaveBeenCalledWith('/app/data/images', { recursive: true })
+    // Verify access was attempted for all base paths
+    expect(fs.access).toHaveBeenCalledTimes(3)
+    expect(fs.access).toHaveBeenCalledWith('/current/working/dir/app/data/images')
+    expect(fs.access).toHaveBeenCalledWith('/current/working/dir/data/images')
+    expect(fs.access).toHaveBeenCalledWith('/current/working/dir/../data/images')
+
+    // Verify mkdir was called with the first base path
+    expect(fs.mkdir).toHaveBeenCalledWith('/current/working/dir/app/data/images', { recursive: true })
+
+    // Verify response
+    expect(response).toHaveProperty('files')
+    expect(response.files).toEqual([])
+  })
+
+  it('should use the first accessible directory path', async () => {
+    // Mock fs.access to fail for first path but succeed for second
+    vi.mocked(fs.access)
+      .mockRejectedValueOnce(new Error('First path not accessible'))
+      .mockResolvedValueOnce(undefined)
+
+    // Mock empty directory
+    vi.mocked(fs.readdir).mockResolvedValueOnce([])
+
+    // Create a mock event with valid type
+    const event = createEvent({
+      method: 'GET',
+      url: '/api/files/images',
+    })
+
+    // Set params
+    event.context.params = { type: 'images' }
+
+    // Call the handler
+    const response = await handler(event)
+
+    // Verify access was attempted twice (should stop after finding valid path)
+    expect(fs.access).toHaveBeenCalledTimes(2)
+    
+    // Verify readdir was called with the second path
+    expect(fs.readdir).toHaveBeenCalledWith('/current/working/dir/data/images')
+    
+    // Verify mkdir was not called
+    expect(fs.mkdir).not.toHaveBeenCalled()
 
     // Verify response
     expect(response).toHaveProperty('files')
@@ -90,7 +136,7 @@ describe('files/[type].get route handler', () => {
   })
 
   it('should filter and sort image files correctly', async () => {
-    // Mock successful directory access
+    // Mock successful directory access on first try
     vi.mocked(fs.access).mockResolvedValueOnce(undefined)
 
     // Mock directory contents
@@ -137,8 +183,8 @@ describe('files/[type].get route handler', () => {
     // Verify response contains only images, sorted by date (newest first)
     expect(response).toHaveProperty('files')
     expect(response.files).toHaveLength(2)
-    expect(response.files[0].name).toBe('image1.png') // Newer date
-    expect(response.files[1].name).toBe('image2.jpg') // Older date
+    expect(response.files[0].name).toBe('image1.png')
+    expect(response.files[1].name).toBe('image2.jpg')
     expect(response.files.some(f => f.name === 'document.pdf')).toBe(false)
     expect(response.files.some(f => f.name === 'data.txt')).toBe(false)
   })
@@ -219,5 +265,42 @@ describe('files/[type].get route handler', () => {
     expect(response.files.some(f => f.name === 'embeddings.npz')).toBe(true)
     expect(response.files.some(f => f.name === 'data.json')).toBe(true)
     expect(response.files.some(f => f.name === 'readme.txt')).toBe(false)
+  })
+
+  it('should filter projections files correctly', async () => {
+    // Mock successful directory access
+    vi.mocked(fs.access).mockResolvedValueOnce(undefined)
+
+    // Mock directory contents
+    vi.mocked(fs.readdir).mockResolvedValueOnce([
+      'projections.json',
+      'data.csv',
+      'notes.txt',
+    ])
+
+    // Mock file stats
+    vi.mocked(fs.stat).mockImplementation(() => {
+      return Promise.resolve({
+        size: 1024,
+        mtime: new Date(),
+      })
+    })
+
+    // Create a mock event with projections type
+    const event = createEvent({
+      method: 'GET',
+      url: '/api/files/projections',
+    })
+
+    // Set params
+    event.context.params = { type: 'projections' }
+
+    // Call the handler
+    const response = await handler(event)
+
+    // Verify response contains only JSON files
+    expect(response).toHaveProperty('files')
+    expect(response.files).toHaveLength(1)
+    expect(response.files[0].name).toBe('projections.json')
   })
 })

@@ -60,10 +60,9 @@ export default defineEventHandler(async (event) => {
 
   // Define possible base directories. This attempts /app/data first and falls back to /data.
   const basePaths = [
-    path.join(process.cwd(), '/app/data'),
-    path.join(process.cwd(), '/data'),
+    path.join(process.cwd(), 'app/data'),
+    path.join(process.cwd(), 'data'),
     path.join(process.cwd(), '../data'),
-    path.resolve(process.cwd(), '../../data'), // Going two levels up if needed
   ]
 
   let finalPath: string | null = null

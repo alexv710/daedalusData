@@ -37,8 +37,8 @@ export default defineEventHandler(async (event) => {
     // neither elegant nor efficient but allows for now to work in local dev with pnpm dev
     // using docker, or also singularity on HPC
     const basePaths = [
-      path.join(process.cwd(), '/app/data'),
-      path.join(process.cwd(), '/data'),
+      path.join(process.cwd(), 'app/data'),
+      path.join(process.cwd(), 'data'),
       path.join(process.cwd(), '../data'),
     ]
 
