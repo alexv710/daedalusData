@@ -555,7 +555,35 @@ onUnmounted(() => {
                     Generate Image Atlas
                   </h2>
 
-                  <div v-if="atlasExists" class="mb-4">
+                  <div v-if="atlasGenerating" class="mb-4">
+                    <v-alert
+                      type="info"
+                      variant="tonal"
+                      class="mb-4"
+                    >
+                      {{ atlasExists ? 'Regenerating atlas...' : 'Generating atlas for the first time...' }}
+                    </v-alert>
+
+                    <p class="mb-2">
+                      {{ atlasProgressMessage }}
+                    </p>
+                    <v-progress-linear
+                      v-model="atlasProgress"
+                      color="primary"
+                      height="20"
+                      striped
+                    >
+                      <template #default>
+                        {{ Math.ceil(atlasProgress) }}%
+                      </template>
+                    </v-progress-linear>
+                    <p class="mt-2 text-sm text-gray-600">
+                      This may take a few minutes for large datasets...
+                    </p>
+                  </div>
+
+                  <!-- Only show this when atlas exists and not generating -->
+                  <div v-else-if="atlasExists" class="mb-4">
                     <v-alert type="success" variant="tonal">
                       Atlas has been generated successfully.
                     </v-alert>
@@ -565,19 +593,10 @@ onUnmounted(() => {
                         Atlas Preview
                       </h3>
                       <img
-                        v-if="atlasExists"
                         :src="`/api/file/${atlasFilename}`"
                         alt="Atlas"
                         class="h-64 w-full border rounded object-contain"
                       >
-                      <div
-                        v-else
-                        class="h-64 w-full flex items-center justify-center border rounded bg-gray-100"
-                      >
-                        <p class="text-gray-500">
-                          Atlas preview not available
-                        </p>
-                      </div>
                     </div>
 
                     <div class="mt-4 flex flex-wrap gap-2">
@@ -600,6 +619,7 @@ onUnmounted(() => {
                     </div>
                   </div>
 
+                  <!-- Show this when no atlas exists and not generating -->
                   <div v-else>
                     <v-alert
                       v-if="atlasError"
@@ -619,26 +639,7 @@ onUnmounted(() => {
                       No atlas found. Generate an atlas to optimize image loading and visualization.
                     </v-alert>
 
-                    <div v-if="atlasGenerating" class="mt-4">
-                      <p class="mb-2">
-                        {{ atlasProgressMessage }}
-                      </p>
-                      <v-progress-linear
-                        v-model="atlasProgress"
-                        color="primary"
-                        height="20"
-                        striped
-                      >
-                        <template #default>
-                          {{ Math.ceil(atlasProgress) }}%
-                        </template>
-                      </v-progress-linear>
-                      <p class="mt-2 text-sm text-gray-600">
-                        This may take a few minutes for large datasets...
-                      </p>
-                    </div>
-
-                    <div v-else class="mt-4">
+                    <div class="mt-4">
                       <p>The atlas combines all images into a single file for efficient loading and display.</p>
 
                       <v-btn
