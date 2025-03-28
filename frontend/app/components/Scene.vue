@@ -990,61 +990,80 @@ onMounted(async () => {
 
   const controls = setupControls(camera, renderer.domElement, sceneRef.value)
   try {
+  // Fetch atlas data JSON
     const response = await fetch('api/file/atlas.json')
     if (!response.ok)
       throw new Error('Failed to fetch atlas.json')
     const atlasData = await response.json()
-    const textureLoader = new THREE.TextureLoader()
-    textureLoader.load(
-      'api/file/atlas.png',
-      async (texture) => {
-        texture.flipY = false
 
-        // If a current projection is set, try to fetch its data to build a projection map.
-        let projectionMap: Map<string, { x: number, y: number }> | undefined
-        if (imageStore.currentProjection) {
-          try {
-            const projResponse = await fetch(`api/file/projections/${imageStore.currentProjection}`)
-            if (projResponse.ok) {
-              const projectionData = await projResponse.json()
-              currentProjectionData.value = projectionData
-              projectionMap = new Map<string, { x: number, y: number }>()
-              projectionData.forEach((item: { image: string, UMAP1: number, UMAP2: number }) => {
-                projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
-              })
-            }
-            else {
-              console.warn('Failed to fetch projection data, using fallback random positions.')
-            }
-          }
-          catch (error) {
-            console.error('Error fetching projection data:', error)
-          }
+    // Create an image element and set up loading promise
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+
+    const imageLoaded = new Promise((resolve, reject) => {
+      img.onload = () => {
+        console.log(`Image loaded successfully: ${img.width}x${img.height}`)
+        resolve(img)
+      }
+      img.onerror = (event) => {
+        console.error('Image failed to load:', event)
+        reject(new Error('Failed to load atlas image'))
+      }
+    })
+
+    // Set image source to start loading
+    img.src = 'api/file/atlas.png'
+
+    // Wait for the image to load
+    const loadedImg = await imageLoaded
+
+    // Create a texture from the loaded image
+    const texture = new THREE.Texture()
+    texture.image = loadedImg
+    texture.flipY = false
+    texture.needsUpdate = true
+
+    console.log('Texture created successfully')
+
+    // If a current projection is set, try to fetch its data to build a projection map.
+    let projectionMap
+    if (imageStore.currentProjection) {
+      try {
+        const projResponse = await fetch(`api/file/projections/${imageStore.currentProjection}`)
+        if (projResponse.ok) {
+          const projectionData = await projResponse.json()
+          currentProjectionData.value = projectionData
+          projectionMap = new Map()
+          projectionData.forEach((item) => {
+            projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
+          })
         }
-
-        // Create the instanced mesh using the projection map if available.
-        const instancedMesh = createInstancedMesh(texture, atlasData, projectionMap)
-        instancedMeshRef.value = instancedMesh
-        sceneRef.value.add(instancedMesh)
-
-        initializeRendering()
-
-        // Only update positions if we have projection data
-        if (currentProjectionData.value.length > 0) {
-          updateInstancePositions(currentProjectionData.value)
+        else {
+          console.warn('Failed to fetch projection data, using fallback random positions.')
         }
+      }
+      catch (error) {
+        console.error('Error fetching projection data:', error)
+      }
+    }
 
-        // Start animation loop.
-        animate()
-      },
-      undefined,
-      (error) => {
-        console.error('Error loading texture:', error)
-      },
-    )
+    // Create the instanced mesh using the projection map if available.
+    const instancedMesh = createInstancedMesh(texture, atlasData, projectionMap)
+    instancedMeshRef.value = instancedMesh
+    sceneRef.value.add(instancedMesh)
+
+    initializeRendering()
+
+    // Only update positions if we have projection data
+    if (currentProjectionData.value.length > 0) {
+      updateInstancePositions(currentProjectionData.value)
+    }
+
+    // Start animation loop.
+    animate()
   }
   catch (err) {
-    console.error('Error fetching atlas data:', err)
+    console.error('Error in setup process:', err)
   }
   window.addEventListener('resize', handleResize)
   window.addEventListener('keydown', handleKeyDown)
