@@ -399,9 +399,6 @@ async function generateAtlas(): Promise<{
     }
   }
 
-  // Process images in batches
-  console.log(`Total images to process: ${packedImages.length}`)
-
   const batches = Math.ceil(packedImages.length / RESIZE_BATCH_SIZE)
   const allComposites: Array<any> = []
 
