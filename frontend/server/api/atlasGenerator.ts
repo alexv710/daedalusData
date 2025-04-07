@@ -374,7 +374,7 @@ async function generateAtlas(): Promise<{
       width: atlasWidth,
       height: atlasHeight,
       channels: 4,
-      background: { r: 255, g: 255, b: 255, alpha: 255 }, // White background
+      background: { r: 255, g: 255, b: 255, alpha: 0 },
     },
     limitInputPixels: false,
   })
