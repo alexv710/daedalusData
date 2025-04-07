@@ -1002,7 +1002,6 @@ onMounted(async () => {
 
     const imageLoaded = new Promise((resolve, reject) => {
       img.onload = () => {
-        console.log(`Image loaded successfully: ${img.width}x${img.height}`)
         resolve(img)
       }
       img.onerror = (event) => {
@@ -1022,8 +1021,6 @@ onMounted(async () => {
     texture.image = loadedImg
     texture.flipY = false
     texture.needsUpdate = true
-
-    console.log('Texture created successfully')
 
     // If a current projection is set, try to fetch its data to build a projection map.
     let projectionMap
