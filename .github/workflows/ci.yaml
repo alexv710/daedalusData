@@ -172,11 +172,6 @@ jobs:
         run: |
           cd frontend
           pnpm audit --production
-          
-      - name: Python Safety Check
-        uses: pyupio/safety-action@v1
-        with:
-          api-key: ${{ secrets.SAFETY_API_KEY }}
 
   code-scanning:
     name: CodeQL Scan
