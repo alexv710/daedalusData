@@ -77,7 +77,6 @@ function checkStepStatus() {
 
 function checkAtlasExists() {
   let atlasImageExists = false
-  console.log('check atlas')
 
   // Perform a HEAD request to check for the atlas file
   fetch(`api/file/${atlasFilename}`, {
@@ -85,7 +84,6 @@ function checkAtlasExists() {
     headers: { 'Cache-Control': 'no-cache' },
   })
     .then((resAtlasImage) => {
-      console.log('resAtlasImage:', resAtlasImage)
       atlasImageExists = resAtlasImage.ok
       if (resAtlasImage.ok) {
         // Check for atlas.json to ensure the metadata exists
@@ -106,7 +104,6 @@ function checkAtlasExists() {
       atlasExists.value = false
       checkStepStatus()
     })
-  console.log('atlas seems to:', atlasExists.value)
 }
 
 function startAtlasGeneration() {
@@ -132,7 +129,6 @@ function startAtlasGeneration() {
         throw new Error(`Failed to start atlas generation: ${res.status} ${res.statusText}. ${errorText}`)
       }
       // Status 202 Accepted
-      console.log('Atlas generation request accepted by server.')
       atlasProgressMessage.value = 'Generation started, monitoring progress...'
       startPollingAtlasStatus()
     })
@@ -148,7 +144,6 @@ function startPollingAtlasStatus() {
   if (atlasStatusInterval.value) {
     clearInterval(atlasStatusInterval.value)
   }
-  console.log('start polling')
 
   atlasStatusInterval.value = window.setInterval(() => {
     fetch('/api/atlasStatus')
@@ -179,7 +174,6 @@ function startPollingAtlasStatus() {
 
 function stopPollingAtlasStatus() {
   if (atlasStatusInterval.value) {
-    console.log('stop polling')
     clearInterval(atlasStatusInterval.value)
     atlasStatusInterval.value = null
   }

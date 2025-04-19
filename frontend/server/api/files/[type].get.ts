@@ -25,8 +25,8 @@ async function getFileStats(dataDir: string) {
 
 async function findRelevantPaths(): Promise<string> {
   const basePaths = [
-    path.join(process.cwd(), '/app/data'),
-    path.join(process.cwd(), '/data'),
+    path.join(process.cwd(), 'app/data'),
+    path.join(process.cwd(), 'data'),
     path.join(process.cwd(), '../data'),
   ]
 
@@ -48,7 +48,6 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-
     const dataDir = await findRelevantPaths()
     if (!dataDir) {
       throw new Error('Could not find an accessible data directory')

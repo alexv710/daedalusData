@@ -1256,8 +1256,8 @@ defineExpose({
             <span class="text-sm">Global Spread</span>
           </div>
           <v-slider
-            v-model="spreadFactor" :min="1" :max="6" :step="0.1" density="compact" color="primary" hide-details
-            thumb-label
+            v-model="spreadFactor" :min="1" :max="6" :step="0.1" density="compact" color="primary"
+            thumb-label hide-details
           />
           <div class="mt-1 flex justify-between text-xs">
             <span>Compact</span>
