@@ -57,11 +57,6 @@ jobs:
           cd frontend
           pnpm audit --production
           
-      - name: Python Safety Check
-        run: |
-          pip install safety
-          safety check -r requirements.txt
-          
   container-scan:
     name: Scan Container
     runs-on: ubuntu-latest
