@@ -1,12 +1,13 @@
+import nfs from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { defineEventHandler } from 'h3'
 
-async function getFileStats(dirPath: string) {
+async function getFileStats(dataDir: string) {
   try {
-    const files = await fs.readdir(dirPath)
+    const files = await fs.readdir(dataDir)
     const statsPromises = files.map(async (file) => {
-      const filePath = path.join(dirPath, file)
+      const filePath = path.join(dataDir, file)
       const stats = await fs.stat(filePath)
       return {
         name: file,
@@ -17,9 +18,23 @@ async function getFileStats(dirPath: string) {
     return Promise.all(statsPromises)
   }
   catch (error) {
-    console.error('Error reading directory:', dirPath, error)
+    console.warn('Error reading directory:', dataDir, error)
     return []
   }
+}
+
+async function findRelevantPaths(): Promise<string> {
+  const basePaths = [
+    path.join(process.cwd(), '/app/data'),
+    path.join(process.cwd(), '/data'),
+    path.join(process.cwd(), '../data'),
+  ]
+
+  const dataDir = basePaths.find(p => nfs.existsSync(p))
+  if (!dataDir) {
+    throw new Error('Could not find an accessible data directory')
+  }
+  return dataDir
 }
 
 export default defineEventHandler(async (event) => {
@@ -33,40 +48,14 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Define possible base directories to check
-    // neither elegant nor efficient but allows for now to work in local dev with pnpm dev
-    // using docker, or also singularity on HPC
-    const basePaths = [
-      path.join(process.cwd(), 'app/data'),
-      path.join(process.cwd(), 'data'),
-      path.join(process.cwd(), '../data'),
-    ]
 
-    let dirPath: string | null = null
-    for (const base of basePaths) {
-      const candidate = path.join(base, type)
-      try {
-        console.info('Attempting to read directory:', candidate)
-        await fs.access(candidate)
-        dirPath = candidate
-        console.info(`Directory found at: ${candidate}`)
-        break
-      }
-      catch (error) {
-        console.info(`Directory ${candidate} not accessible:`, error)
-        // Try the next base path
-      }
+    const dataDir = await findRelevantPaths()
+    if (!dataDir) {
+      throw new Error('Could not find an accessible data directory')
     }
 
-    // If no existing directory was found, create it at the first path
-    if (!dirPath) {
-      dirPath = path.join(basePaths[0], type)
-      console.info(`Creating directory ${dirPath} as it doesn't exist yet`)
-      await fs.mkdir(dirPath, { recursive: true })
-    }
-
+    const dirPath = path.join(dataDir, type)
     const files = await getFileStats(dirPath)
-    console.info(`Found ${files.length} files in ${type}`)
 
     // Filter files based on type
     let filteredFiles = files
@@ -102,7 +91,7 @@ export default defineEventHandler(async (event) => {
     return { files: filteredFiles }
   }
   catch (error) {
-    console.error(`Error reading ${type} directory:`, error)
+    console.warn(`Error reading ${type} directory:`, error)
     return { error: `Failed to read ${type} directory`, details: error.message }
   }
 })
