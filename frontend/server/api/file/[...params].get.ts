@@ -1,124 +1,102 @@
-import fs, { createReadStream } from 'node:fs'
+import fs from 'node:fs'
 import path from 'node:path'
 import { createError, defineEventHandler, sendStream } from 'h3'
 
-export default defineEventHandler(async (event) => {
-  // Retrieve the catch-all parameter.
-  // When using a catch-all route (e.g. [ ...params ].get.ts),
-  // the parameter might be passed as a string (with slashes) or as an array.
-  const rawParams = event.context.params?.params
-  let params: string[] = []
-  if (typeof rawParams === 'string') {
-    params = rawParams.split('/')
-  }
-  else if (Array.isArray(rawParams)) {
-    params = rawParams
-  }
-  console.info('Requested params:', params)
-  console.info('Request method:', event.node.req.method)
 
-  let relativePath: string
-  if (params.length === 1) {
-    // For a single parameter, if it's "atlas.png" or "atlas.json", serve from the root.
-    if (params[0] === 'atlas.png' || params[0] === 'atlas.json') {
-      relativePath = params[0]
-    }
-    else {
-      // Otherwise, assume it's an image in the "images" folder.
-      relativePath = path.join('images', params[0])
-    }
+const CONTENT_TYPE_MAP: Record<string, string> = {
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.json': 'application/json',
+};
+const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
+
+async function findRelevantPaths(): Promise<string> {
+  const basePaths = [
+    path.join(process.cwd(), '/app/data'),
+    path.join(process.cwd(), '/data'),
+    path.join(process.cwd(), '../data'),
+  ]
+  
+  const dataDir = basePaths.find(p => fs.existsSync(p))
+  if (!dataDir) {
+    throw new Error('Could not find an accessible data directory')
   }
-  else if (params.length === 2) {
-    const dir = params[0].toLowerCase()
-    const file = params[1]
-    // Allowed directories.
-    const allowedDirs = ['images', 'metadata', 'labels', 'projections', 'features']
-    if (!allowedDirs.includes(dir)) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Bad Request',
-        message: 'Invalid directory requested',
-      })
-    }
-    // For directories other than "images", only allow .json files.
-    if (dir !== 'images' && !file.toLowerCase().endsWith('.json')) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Bad Request',
-        message: `Only .json files are allowed in the ${dir} directory`,
-      })
-    }
-    relativePath = path.join(dir, file)
-  }
-  else {
+  return dataDir
+}
+const DATA_ROOT = await findRelevantPaths()
+console.info(`Serving static files from: ${DATA_ROOT}`);
+
+export default defineEventHandler(async (event) => {
+  const rawParams = event.context.params?.params;
+  const requestedRelativePath = Array.isArray(rawParams) ? rawParams.join('/') : rawParams || '';
+
+  if (!requestedRelativePath) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Bad Request',
-      message: 'Invalid parameters',
-    })
+      message: 'No file path specified in the request.',
+    });
   }
 
-  // Define possible base directories. This attempts /app/data first and falls back to /data.
-  const basePaths = [
-    path.join(process.cwd(), 'app/data'),
-    path.join(process.cwd(), 'data'),
-    path.join(process.cwd(), '../data'),
-  ]
+  const finalPath = path.join(DATA_ROOT, requestedRelativePath);
 
-  let finalPath: string | null = null
-  for (const base of basePaths) {
-    const candidate = path.join(base, relativePath)
-    try {
-      await fs.promises.access(candidate, fs.constants.R_OK)
-      finalPath = candidate
-      console.info(`File exists at: ${candidate}`)
-      break
-    }
-    catch (error) {
-      console.info(`File ${candidate} not accessible:`, error.message)
-      finalPath = null
-      // Try the next base path.
-    }
+  const relativeFromRoot = path.relative(DATA_ROOT, finalPath);
+  if (relativeFromRoot.startsWith('..') || path.isAbsolute(relativeFromRoot)) {
+      console.warn(`Potential path traversal attempt: ${requestedRelativePath} resolved outside DATA_ROOT`);
+      throw createError({
+          statusCode: 400,
+          statusMessage: 'Bad Request',
+          message: 'Invalid file path requested.',
+      });
   }
-  console.info('Final path:', finalPath)
 
-  if (finalPath === null) {
-    console.error('File not found:', relativePath)
+  let stats: fs.Stats;
+  try {
+    stats = await fs.promises.stat(finalPath);
+
+    if (!stats.isFile()) {
+        throw createError({
+            statusCode: 400,
+            statusMessage: 'Bad Request',
+            message: 'Requested path is not a file.',
+        });
+    }
+  } catch (error: any) {
+    // Handle file not found specifically
+    if (error.code === 'ENOENT') {
+      console.warn(`File not found: ${finalPath}`);
+      throw createError({
+        statusCode: 404,
+        statusMessage: 'Not Found',
+        message: 'The requested file could not be found.',
+      });
+    }
+    // Handle other potential errors (permissions, etc.)
+    console.error(`Error accessing file ${finalPath}:`, error);
     throw createError({
-      statusCode: 404,
-      statusMessage: 'Not Found',
-      message: 'File not found',
-    })
+      statusCode: 500,
+      statusMessage: 'Internal Server Error',
+      message: 'Could not access the requested file due to a server error.',
+    });
   }
 
-  // Set the appropriate Content-Type header based on the file extension.
-  let contentType = 'application/octet-stream'
-  if (finalPath.endsWith('.png')) {
-    contentType = 'image/png'
-  }
-  else if (finalPath.endsWith('.jpg') || finalPath.endsWith('.jpeg')) {
-    contentType = 'image/jpeg'
-  }
-  else if (finalPath.endsWith('.gif')) {
-    contentType = 'image/gif'
-  }
-  else if (finalPath.endsWith('.json')) {
-    contentType = 'application/json'
-  }
+  const extension = path.extname(finalPath).toLowerCase();
+  const contentType = CONTENT_TYPE_MAP[extension] || DEFAULT_CONTENT_TYPE;
+  event.node.res.setHeader('Content-Type', contentType);
+  event.node.res.setHeader('Content-Length', stats.size);
 
-  event.node.res.setHeader('Content-Type', contentType)
 
-  // Get file stats to set Content-Length header
-  const stats = await fs.promises.stat(finalPath)
-  event.node.res.setHeader('Content-Length', stats.size)
-
-  // For HEAD requests, we just return the headers without the body
   if (event.node.req.method === 'HEAD') {
-    event.node.res.statusCode = 200
-    event.node.res.end()
-    return
+    event.node.res.statusCode = 200;
+    event.node.res.end();
+    return;
   }
 
-  // For GET requests, stream the file to the client
-  return sendStream(event, createReadStream(finalPath))
-})
+  // GET: Stream the file content.
+  if (event.node.req.method === 'GET') {
+    return sendStream(event, fs.createReadStream(finalPath));
+  }
+});
