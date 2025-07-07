@@ -2,7 +2,7 @@
 keras==3.9.0
 numpy==2.0.2
 pandas==2.2.3
-pillow==11.1.0
+pillow==11.3.0
 scikit-learn==1.6.1
 umap-learn==0.5.7
 tensorflow==2.18.0
