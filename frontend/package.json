@@ -51,7 +51,7 @@
     "@pinia/nuxt": "^0.9.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
-    "@unocss/eslint-config": "^65.4.3",
+    "@unocss/eslint-config": "^66.4.1",
     "@unocss/nuxt": "^65.4.3",
     "@vite-pwa/nuxt": "^0.10.6",
     "@vitejs/plugin-vue": "^5.2.1",
