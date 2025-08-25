@@ -1,7 +1,7 @@
 
 keras==3.9.0
 numpy==2.0.2
-pandas==2.2.3
+pandas==2.3.2
 pillow==11.1.0
 scikit-learn==1.6.1
 umap-learn==0.5.7
