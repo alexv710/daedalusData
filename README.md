@@ -49,33 +49,50 @@ That's it! Everything else runs inside Docker, so you don't need to worry about 
 
 ### Quick Start
 
-1. Clone the repository:
-   ```bash
-   git clone git@github.com:alexv710/daedalusData.git
-   cd daedalusdata
-   ```
+#### 1. Clone & Launch
 
-2. Start the application:
-   ```bash
-   docker compose up -d
-   ```
+```bash
+git clone git@github.com:alexv710/daedalusData.git
+cd daedalusdata
+docker compose up -d
+```
 
-3. Access the application:
-   - Frontend: [http://localhost:3000](http://localhost:3000)
-   - Jupyter: [http://localhost:8888](http://localhost:8888) (token: `daedalus-dev`)
+This starts two services:
+- **Frontend** → [http://localhost:3000](http://localhost:3000)
+- **Jupyter Lab** → [http://localhost:8888](http://localhost:8888)
 
-4. Run the included example notebooks:
-   - Open Jupyter in your browser
-   - Navigate to the example notebooks
-   - Run the notebooks in sequence to process the sample dataset
+#### 2. Prepare Sample Data
 
-That's it! You now have a fully functional image exploration and labeling system.
+Open Jupyter at **[http://localhost:8888](http://localhost:8888)** and run the following notebooks in order:
+
+| Notebook | Purpose | Output |
+|----------|---------|--------|
+| `load_demo_dataset.ipynb` | Download sample dataset | `data/images/` & `data/metadata/` |
+| `feature_extraction.ipynb` | Extract image features | `data/features/` |
+| `Dimensionality_Reduction.ipynb` | Compute 2D projections | `data/projections/` |
+
+> **Tip:** Run all cells in each notebook sequentially before moving to the next.
+
+#### 3. Generate Atlas & Explore
+
+1. Open the frontend at **[http://localhost:3000](http://localhost:3000)**
+2. Verify that images, metadata, features, and projections show as loaded:
+
+   ![DaedalusData Status](docs/status.png)
+
+3. Click **`GENERATE ATLAS`** to create an optimized image atlas for fast loading:
+
+   ![DaedalusData Atlas Generation](docs/atlas-status.png)
+
+4. Once complete, click **`EXPLORE DATASET`** to start exploring and labeling:
+
+   ![DaedalusData Atlas Generated](docs/atlas-loaded.png)
+
 
 ### Configuration
 
 The application is configured through the `compose.yaml` file. Key configuration options:
 
-- `JUPYTER_TOKEN`: Authentication token for Jupyter (default: `daedalus-dev`)
 - Volume mounts for data directories
 
 ## Data Organization
@@ -271,7 +288,7 @@ The notebooks generate two standard projections:
 - Image-only projection based on visual features
 - Combined projection integrating image features and metadata
 
-Access Jupyter at [http://localhost:8888](http://localhost:8888) with token `daedalus-dev`.
+Access Jupyter at [http://localhost:8888](http://localhost:8888).
 
 ### Frontend Interface
 
