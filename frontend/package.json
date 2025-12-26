@@ -9,6 +9,7 @@
     "url": "https://github.com/alexv710/daedalusData.git"
   },
   "scripts": {
+    "postinstall": "nuxi prepare",
     "build": "nuxi build",
     "dev:pwa": "VITE_PLUGIN_PWA=true nuxi dev",
     "dev": "nuxi dev",
