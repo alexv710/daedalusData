@@ -319,7 +319,7 @@ onUnmounted(() => {
 
             <v-stepper-window>
               <!-- Step 1: Images -->
-              <v-stepper-window-item value="0">
+              <v-stepper-window-item :value="0">
                 <v-card-text>
                   <h2 class="mb-4 text-xl font-semibold">
                     Add Images to Your Dataset
@@ -372,7 +372,7 @@ onUnmounted(() => {
               </v-stepper-window-item>
 
               <!-- Step 2: Metadata -->
-              <v-stepper-window-item value="1">
+              <v-stepper-window-item :value="1">
                 <v-card-text>
                   <h2 class="mb-4 text-xl font-semibold">
                     Add Metadata for Your Images
@@ -435,7 +435,7 @@ onUnmounted(() => {
               </v-stepper-window-item>
 
               <!-- Step 3: Features -->
-              <v-stepper-window-item value="2">
+              <v-stepper-window-item :value="2">
                 <v-card-text>
                   <h2 class="mb-4 text-xl font-semibold">
                     Extract Features from Your Images
@@ -492,7 +492,7 @@ onUnmounted(() => {
               </v-stepper-window-item>
 
               <!-- Step 4: Projections -->
-              <v-stepper-window-item value="3">
+              <v-stepper-window-item :value="3">
                 <v-card-text>
                   <h2 class="mb-4 text-xl font-semibold">
                     Calculate Dimensionality Reductions
@@ -549,7 +549,7 @@ onUnmounted(() => {
               </v-stepper-window-item>
 
               <!-- Step 5: Atlas -->
-              <v-stepper-window-item value="4">
+              <v-stepper-window-item :value="4">
                 <v-card-text>
                   <h2 class="mb-4 text-xl font-semibold">
                     Generate Image Atlas
