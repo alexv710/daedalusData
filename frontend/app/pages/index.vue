@@ -554,7 +554,6 @@ onUnmounted(() => {
                   <h2 class="mb-4 text-xl font-semibold">
                     Generate Image Atlas
                   </h2>
-                  <p>atlasExists {{ atlasExists }}</p>
 
                   <div v-if="atlasGenerating" class="mb-4">
                     <v-alert

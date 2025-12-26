@@ -15,7 +15,7 @@ services:
       - pnpm_store:/app/frontend/.pnpm-store
     environment:
       - NODE_ENV=development
-      - JUPYTER_TOKEN=daedalus-dev
+      - JUPYTER_TOKEN=''
       - CHOKIDAR_USEPOLLING=true
     command: >
       sh -c "rm -f /tmp/nitro/worker*.sock && 
