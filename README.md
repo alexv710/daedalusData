@@ -319,7 +319,12 @@ Access the frontend at [http://localhost:3000](http://localhost:3000).
 
 ## Contributing
 
-Contributions are welcome! Please feel free to reach out if you have a specific use case or submit a Pull Request.
+Contributions are welcome! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on:
+
+- Reporting bugs
+- Suggesting features  
+- Submitting pull requests
+- Getting help and support
 
 ## License
 
