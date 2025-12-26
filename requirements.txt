@@ -5,4 +5,5 @@ pillow==11.1.0
 tensorflow==2.18.0
 umap-learn==0.5.8
 kagglehub
-requests
+requests>=2.32.4
+urllib3>=2.6.0
