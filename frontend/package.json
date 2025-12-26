@@ -22,10 +22,7 @@
     "test": "vitest",
     "test:ci": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "commit": "cz",
-    "prepare": "cd .. && husky install frontend/.husky",
-    "postinstall": "pinst --enable",
-    "prepack": "pinst --disable"
+    "commit": "cz"
   },
   "dependencies": {
     "d3": "^7.9.0",
@@ -68,11 +65,9 @@
     "eslint-plugin-format": "^1.0.1",
     "globals": "^16.0.0",
     "happy-dom": "^17.4.1",
-    "husky": "^8.0.0",
     "jsdom": "^26.0.0",
     "nuxt": "3.15.4",
     "pinia": "^2.3.1",
-    "pinst": "^3.0.0",
     "semantic-release": "^24.2.3",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.50.1",
