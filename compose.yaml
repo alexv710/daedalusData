@@ -21,7 +21,7 @@ services:
       --ip=0.0.0.0 
       --allow-root 
       --no-browser 
-      --NotebookApp.token=daedalus-dev 
+      --NotebookApp.token=''
       --notebook-dir=/app/notebooks & 
       cd frontend && pnpm install && pnpm run dev"
 
