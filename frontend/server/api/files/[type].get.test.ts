@@ -1,25 +1,30 @@
 // Import mocked modules
 import fs from 'node:fs/promises'
-
+import nfs from 'node:fs'
+import path from 'node:path'
 import { createEvent } from 'h3'
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-// Use the Nuxt alias for importing the handler
-import handler from './[type].get'
+import handler from './[type].get' // Nuxt alias
 
-// Mock the fs and path modules
+// Mock the fs/promises module (async API)
 vi.mock('node:fs/promises', () => ({
   default: {
     readdir: vi.fn(),
     stat: vi.fn(),
-    access: vi.fn(),
-    mkdir: vi.fn(),
   },
 }))
 
+// Mock the node:fs module (sync API: existsSync)
+vi.mock('node:fs', () => ({
+  default: {
+    existsSync: vi.fn(),
+  },
+}))
+
+// Mock the path module as before
 vi.mock('node:path', () => ({
   default: {
-    join: vi.fn((dir, type) => `/app/data/${type}`),
+    join: vi.fn((...args) => args.join('/'))
   },
 }))
 
@@ -27,7 +32,8 @@ describe('files/[type].get route handler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    // Default mock for console methods
+    vi.spyOn(process, 'cwd').mockReturnValue('/current/working/dir')
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'info').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })
@@ -37,19 +43,10 @@ describe('files/[type].get route handler', () => {
   })
 
   it('should return error for invalid file type', async () => {
-    // Create a mock event with invalid type
-    const event = createEvent({
-      method: 'GET',
-      url: '/api/files/invalid',
-    })
-
-    // Set params
+    const event = createEvent({ method: 'GET', url: '/api/files/invalid' })
     event.context.params = { type: 'invalid' }
-
-    // Call the handler
     const response = await handler(event)
 
-    // Verify response
     expect(response).toHaveProperty('error')
     expect(response.error).toContain('Invalid file type requested')
     expect(response).toHaveProperty('validTypes')
@@ -59,165 +56,119 @@ describe('files/[type].get route handler', () => {
     expect(response.validTypes).toContain('projections')
   })
 
-  it('should create directory if it does not exist', async () => {
-    // Mock fs.access to throw error
-    vi.mocked(fs.access).mockRejectedValueOnce(new Error('Directory not found'))
+  it('should throw error if none of the base paths exist', async () => {
+    vi.mocked(nfs.existsSync).mockReturnValue(false)
+    const event = createEvent({ method: 'GET', url: '/api/files/images' })
+    event.context.params = { type: 'images' }
+    const response = await handler(event)
+    // Handler now throws, but it catches and returns an error object
+    expect(response).toHaveProperty('error')
+    expect(response.error).toMatch(/Failed to read images directory/)
+    expect(response.details).toMatch(/Could not find an accessible data directory/)
+  })
 
-    // Mock successful directory creation
-    vi.mocked(fs.mkdir).mockResolvedValueOnce(undefined)
-
-    // Mock empty directory
+  it('should use the first existing directory path', async () => {
+    vi.mocked(nfs.existsSync)
+      .mockImplementationOnce((p) => p === '/current/working/dir/app/data')
     vi.mocked(fs.readdir).mockResolvedValueOnce([])
 
-    // Create a mock event with valid type
-    const event = createEvent({
-      method: 'GET',
-      url: '/api/files/images',
-    })
-
-    // Set params
+    const event = createEvent({ method: 'GET', url: '/api/files/images' })
     event.context.params = { type: 'images' }
-
-    // Call the handler
     const response = await handler(event)
 
-    // Verify mkdir was called
-    expect(fs.mkdir).toHaveBeenCalledWith('/app/data/images', { recursive: true })
-
-    // Verify response
+    expect(nfs.existsSync).toHaveBeenCalledWith('/current/working/dir/app/data')
+    // Should only check until it finds one (i.e., first called true)
+    expect(fs.readdir).toHaveBeenCalledWith('/current/working/dir/app/data/images')
     expect(response).toHaveProperty('files')
     expect(response.files).toEqual([])
   })
 
-  it('should filter and sort image files correctly', async () => {
-    // Mock successful directory access
-    vi.mocked(fs.access).mockResolvedValueOnce(undefined)
+  it('should use the second base dir if the first does not exist', async () => {
+    vi.mocked(nfs.existsSync)
+      .mockImplementation((p) => p === '/current/working/dir/data') // only 2nd exists
+    vi.mocked(fs.readdir).mockResolvedValueOnce([])
 
-    // Mock directory contents
-    vi.mocked(fs.readdir).mockResolvedValueOnce([
-      'image1.png',
-      'image2.jpg',
-      'document.pdf',
-      'data.txt',
-    ])
-
-    // Mock file stats
-    const mockStat = (filename, size, mtime) => {
-      return {
-        size,
-        mtime: new Date(mtime),
-      }
-    }
-
-    vi.mocked(fs.stat).mockImplementation((path) => {
-      if (path.includes('image1.png'))
-        return Promise.resolve(mockStat('image1.png', 1024, '2023-01-02'))
-      if (path.includes('image2.jpg'))
-        return Promise.resolve(mockStat('image2.jpg', 2048, '2023-01-01'))
-      if (path.includes('document.pdf'))
-        return Promise.resolve(mockStat('document.pdf', 3072, '2023-01-03'))
-      if (path.includes('data.txt'))
-        return Promise.resolve(mockStat('data.txt', 512, '2023-01-04'))
-
-      return Promise.reject(new Error('Unknown file'))
-    })
-
-    // Create a mock event with images type
-    const event = createEvent({
-      method: 'GET',
-      url: '/api/files/images',
-    })
-
-    // Set params
+    const event = createEvent({ method: 'GET', url: '/api/files/images' })
     event.context.params = { type: 'images' }
-
-    // Call the handler
     const response = await handler(event)
 
-    // Verify response contains only images, sorted by date (newest first)
+    expect(nfs.existsSync).toHaveBeenCalledWith('/current/working/dir/app/data')
+    expect(nfs.existsSync).toHaveBeenCalledWith('/current/working/dir/data')
+    expect(response.files).toEqual([])
+    expect(fs.readdir).toHaveBeenCalledWith('/current/working/dir/data/images')
+  })
+
+  it('should filter and sort image files correctly', async () => {
+    vi.mocked(nfs.existsSync).mockImplementation(() => true) // any basepath exists
+    vi.mocked(fs.readdir).mockResolvedValueOnce([
+      'image1.png', 'image2.jpg', 'document.pdf', 'data.txt'
+    ])
+
+    // mtime objects for sorting
+    const mockStat = (filename, size, mtime) => ({ size, mtime: new Date(mtime) })
+    vi.mocked(fs.stat).mockImplementation((filepath) => {
+      if (filepath.endsWith('image1.png')) return Promise.resolve(mockStat('image1.png', 1024, '2023-01-02'))
+      if (filepath.endsWith('image2.jpg')) return Promise.resolve(mockStat('image2.jpg', 2048, '2023-01-01'))
+      if (filepath.endsWith('document.pdf')) return Promise.resolve(mockStat('document.pdf', 3072, '2023-01-03'))
+      if (filepath.endsWith('data.txt')) return Promise.resolve(mockStat('data.txt', 512, '2023-01-04'))
+      return Promise.reject(new Error('Not found'))
+    })
+
+    const event = createEvent({ method: 'GET', url: '/api/files/images' })
+    event.context.params = { type: 'images' }
+    const response = await handler(event)
+
     expect(response).toHaveProperty('files')
     expect(response.files).toHaveLength(2)
-    expect(response.files[0].name).toBe('image1.png') // Newer date
-    expect(response.files[1].name).toBe('image2.jpg') // Older date
+    expect(response.files[0].name).toBe('image1.png') // 2023-01-02 newer than 2023-01-01
+    expect(response.files[1].name).toBe('image2.jpg')
     expect(response.files.some(f => f.name === 'document.pdf')).toBe(false)
     expect(response.files.some(f => f.name === 'data.txt')).toBe(false)
   })
 
   it('should filter metadata files correctly', async () => {
-    // Mock successful directory access
-    vi.mocked(fs.access).mockResolvedValueOnce(undefined)
+    vi.mocked(nfs.existsSync).mockImplementation(() => true)
+    vi.mocked(fs.readdir).mockResolvedValueOnce(['data.json', 'config.yaml', 'info.txt'])
+    vi.mocked(fs.stat).mockResolvedValue({ size: 1024, mtime: new Date() })
 
-    // Mock directory contents
-    vi.mocked(fs.readdir).mockResolvedValueOnce([
-      'data.json',
-      'config.yaml',
-      'info.txt',
-    ])
-
-    // Mock file stats
-    vi.mocked(fs.stat).mockImplementation(() => {
-      return Promise.resolve({
-        size: 1024,
-        mtime: new Date(),
-      })
-    })
-
-    // Create a mock event with metadata type
-    const event = createEvent({
-      method: 'GET',
-      url: '/api/files/metadata',
-    })
-
-    // Set params
+    const event = createEvent({ method: 'GET', url: '/api/files/metadata' })
     event.context.params = { type: 'metadata' }
-
-    // Call the handler
     const response = await handler(event)
 
-    // Verify response contains only JSON files
     expect(response).toHaveProperty('files')
     expect(response.files).toHaveLength(1)
     expect(response.files[0].name).toBe('data.json')
   })
 
   it('should filter features files correctly', async () => {
-    // Mock successful directory access
-    vi.mocked(fs.access).mockResolvedValueOnce(undefined)
+    vi.mocked(nfs.existsSync).mockImplementation(() => true)
+    vi.mocked(fs.readdir).mockResolvedValueOnce(['features.csv', 'embeddings.npz', 'data.json', 'readme.txt'])
+    vi.mocked(fs.stat).mockResolvedValue({ size: 1024, mtime: new Date() })
 
-    // Mock directory contents
-    vi.mocked(fs.readdir).mockResolvedValueOnce([
-      'features.csv',
-      'embeddings.npz',
-      'data.json',
-      'readme.txt',
-    ])
-
-    // Mock file stats
-    vi.mocked(fs.stat).mockImplementation(() => {
-      return Promise.resolve({
-        size: 1024,
-        mtime: new Date(),
-      })
-    })
-
-    // Create a mock event with features type
-    const event = createEvent({
-      method: 'GET',
-      url: '/api/files/features',
-    })
-
-    // Set params
+    const event = createEvent({ method: 'GET', url: '/api/files/features' })
     event.context.params = { type: 'features' }
-
-    // Call the handler
     const response = await handler(event)
 
-    // Verify response contains only CSV, JSON, and NPZ files
     expect(response).toHaveProperty('files')
     expect(response.files).toHaveLength(3)
     expect(response.files.some(f => f.name === 'features.csv')).toBe(true)
     expect(response.files.some(f => f.name === 'embeddings.npz')).toBe(true)
     expect(response.files.some(f => f.name === 'data.json')).toBe(true)
     expect(response.files.some(f => f.name === 'readme.txt')).toBe(false)
+  })
+
+  it('should filter projections files correctly', async () => {
+    vi.mocked(nfs.existsSync).mockImplementation(() => true)
+    vi.mocked(fs.readdir).mockResolvedValueOnce(['projections.json', 'data.csv', 'notes.txt'])
+    vi.mocked(fs.stat).mockResolvedValue({ size: 1024, mtime: new Date() })
+    vi.mocked(fs.stat).mockResolvedValue({ size: 1024, mtime: new Date() })
+
+    const event = createEvent({ method: 'GET', url: '/api/files/projections' })
+    event.context.params = { type: 'projections' }
+    const response = await handler(event)
+
+    expect(response).toHaveProperty('files')
+    expect(response.files).toHaveLength(1)
+    expect(response.files[0].name).toBe('projections.json')
   })
 })

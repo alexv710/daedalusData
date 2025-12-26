@@ -332,3 +332,14 @@ This open-source implementation builds upon research originally published in IEE
 The original design study addressed challenges in medical diagnostics, specifically focusing on particle-based contamination in in-vitro diagnostics consumables. This dockerized implementation makes the DaedalusData approach accessible to researchers in various domains beyond medical manufacturing.
 
 For more information about the design study methodology, evaluation results, and theoretical framework for knowledge externalization, please refer to the original publication.
+
+
+# Appendix
+
+### HPC deployment
+
+```bash
+# adjust the docker tag
+singularity pull docker://ghcr.io/alexv710/daedalusdata/frontend:sha-a0a47b7
+singularity run -B ./data:/app/data frontend_sha-5ed09d8.sif
+```

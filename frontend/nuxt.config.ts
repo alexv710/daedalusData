@@ -11,6 +11,7 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     'vuetify-nuxt-module',
   ],
+  ssr: true,
 
   devtools: {
     enabled: true,
@@ -67,15 +68,6 @@ export default defineNuxtConfig({
         target: 'esnext',
       },
     },
-    prerender: {
-      crawlLinks: false,
-      routes: ['/'],
-      ignore: ['/hi'],
-    },
-    static: {
-      dir: '/app/data',
-      prefix: '/data/',
-    },
     publicAssets: [
       {
         dir: '/app/data',
@@ -93,6 +85,5 @@ export default defineNuxtConfig({
       },
     },
   },
-
   pwa,
 })

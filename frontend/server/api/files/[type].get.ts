@@ -1,12 +1,13 @@
+import nfs from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { defineEventHandler } from 'h3'
 
-async function getFileStats(dirPath: string) {
+async function getFileStats(dataDir: string) {
   try {
-    const files = await fs.readdir(dirPath)
+    const files = await fs.readdir(dataDir)
     const statsPromises = files.map(async (file) => {
-      const filePath = path.join(dirPath, file)
+      const filePath = path.join(dataDir, file)
       const stats = await fs.stat(filePath)
       return {
         name: file,
@@ -17,9 +18,23 @@ async function getFileStats(dirPath: string) {
     return Promise.all(statsPromises)
   }
   catch (error) {
-    console.error('Error reading directory:', dirPath, error)
+    console.warn('Error reading directory:', dataDir, error)
     return []
   }
+}
+
+async function findRelevantPaths(): Promise<string> {
+  const basePaths = [
+    path.join(process.cwd(), 'app/data'),
+    path.join(process.cwd(), 'data'),
+    path.join(process.cwd(), '../data'),
+  ]
+
+  const dataDir = basePaths.find(p => nfs.existsSync(p))
+  if (!dataDir) {
+    throw new Error('Could not find an accessible data directory')
+  }
+  return dataDir
 }
 
 export default defineEventHandler(async (event) => {
@@ -33,21 +48,13 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Debug log
-    const dirPath = path.join('/app/data', type)
-    console.info('Attempting to read directory:', dirPath)
-
-    // Make sure the directory exists, if not create it
-    try {
-      await fs.access(dirPath)
-    }
-    catch (error) {
-      console.info(`Creating directory ${dirPath} as it doesn't exist yet, error:`, error)
-      await fs.mkdir(dirPath, { recursive: true })
+    const dataDir = await findRelevantPaths()
+    if (!dataDir) {
+      throw new Error('Could not find an accessible data directory')
     }
 
+    const dirPath = path.join(dataDir, type)
     const files = await getFileStats(dirPath)
-    console.info(`Found ${files.length} files in ${type}`)
 
     // Filter files based on type
     let filteredFiles = files
@@ -83,7 +90,7 @@ export default defineEventHandler(async (event) => {
     return { files: filteredFiles }
   }
   catch (error) {
-    console.error(`Error reading ${type} directory:`, error)
+    console.warn(`Error reading ${type} directory:`, error)
     return { error: `Failed to read ${type} directory`, details: error.message }
   }
 })

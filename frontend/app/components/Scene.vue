@@ -36,6 +36,7 @@ const imageSize = ref(1.0)
 const repulsionStrength = ref(0.1)
 const currentProjectionData = ref<any[]>([])
 const isControlsOpen = ref(true)
+const atlasIsLoading = ref(true)
 
 // ----- Raycasting & Lasso Handling -----
 const raycaster = new THREE.Raycaster()
@@ -61,7 +62,7 @@ const lassoShapeMesh = shallowRef<THREE.Mesh | null>(null)
 
 // ----- Animate function variable -----
 // Declare animate in outer scope so that the watcher can call it.
-let animate = () => {}
+let animate = () => { }
 
 // ----- Resize Handling -----
 function handleResize() {
@@ -944,6 +945,7 @@ function findHoveredInstance() {
 
 // ----- Main onMounted Block -----
 onMounted(async () => {
+  atlasIsLoading.value = true
   if (imageStore.images.size === 0) {
     await imageStore.loadImageMetadata()
     await imageStore.loadProjections()
@@ -990,61 +992,80 @@ onMounted(async () => {
 
   const controls = setupControls(camera, renderer.domElement, sceneRef.value)
   try {
-    const response = await fetch('/data/atlas.json')
+    // Fetch atlas data JSON
+    const response = await fetch('api/file/atlas.json')
     if (!response.ok)
       throw new Error('Failed to fetch atlas.json')
     const atlasData = await response.json()
-    const textureLoader = new THREE.TextureLoader()
-    textureLoader.load(
-      '/data/atlas.png',
-      async (texture) => {
-        texture.flipY = false
 
-        // If a current projection is set, try to fetch its data to build a projection map.
-        let projectionMap: Map<string, { x: number, y: number }> | undefined
-        if (imageStore.currentProjection) {
-          try {
-            const projResponse = await fetch(`/data/projections/${imageStore.currentProjection}`)
-            if (projResponse.ok) {
-              const projectionData = await projResponse.json()
-              currentProjectionData.value = projectionData
-              projectionMap = new Map<string, { x: number, y: number }>()
-              projectionData.forEach((item: { image: string, UMAP1: number, UMAP2: number }) => {
-                projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
-              })
-            }
-            else {
-              console.warn('Failed to fetch projection data, using fallback random positions.')
-            }
-          }
-          catch (error) {
-            console.error('Error fetching projection data:', error)
-          }
+    // Create an image element and set up loading promise
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+
+    const imageLoaded = new Promise((resolve, reject) => {
+      img.onload = () => {
+        resolve(img)
+      }
+      img.onerror = (event) => {
+        console.error('Image failed to load:', event)
+        reject(new Error('Failed to load atlas image'))
+      }
+    })
+
+    // Set image source to start loading
+    img.src = 'api/file/atlas.webp'
+
+    // Wait for the image to load
+    const loadedImg = await imageLoaded
+
+    // Create a texture from the loaded image
+    const texture = new THREE.Texture()
+    texture.image = loadedImg
+    texture.flipY = false
+    texture.needsUpdate = true
+
+    // If a current projection is set, try to fetch its data to build a projection map.
+    let projectionMap
+    if (imageStore.currentProjection) {
+      try {
+        const projResponse = await fetch(`api/file/projections/${imageStore.currentProjection}`)
+        if (projResponse.ok) {
+          const projectionData = await projResponse.json()
+          currentProjectionData.value = projectionData
+          projectionMap = new Map()
+          projectionData.forEach((item) => {
+            projectionMap.set(item.image.toLowerCase(), { x: item.UMAP1, y: item.UMAP2 })
+          })
         }
-
-        // Create the instanced mesh using the projection map if available.
-        const instancedMesh = createInstancedMesh(texture, atlasData, projectionMap)
-        instancedMeshRef.value = instancedMesh
-        sceneRef.value.add(instancedMesh)
-
-        initializeRendering()
-
-        // Only update positions if we have projection data
-        if (currentProjectionData.value.length > 0) {
-          updateInstancePositions(currentProjectionData.value)
+        else {
+          console.warn('Failed to fetch projection data, using fallback random positions.')
         }
+      }
+      catch (error) {
+        console.error('Error fetching projection data:', error)
+      }
+    }
 
-        // Start animation loop.
-        animate()
-      },
-      undefined,
-      (error) => {
-        console.error('Error loading texture:', error)
-      },
-    )
+    // Create the instanced mesh using the projection map if available.
+    const instancedMesh = createInstancedMesh(texture, atlasData, projectionMap)
+    instancedMeshRef.value = instancedMesh
+    sceneRef.value.add(instancedMesh)
+
+    initializeRendering()
+
+    // Only update positions if we have projection data
+    if (currentProjectionData.value.length > 0) {
+      updateInstancePositions(currentProjectionData.value)
+    }
+
+    // Start animation loop.
+    animate()
   }
   catch (err) {
-    console.error('Error fetching atlas data:', err)
+    console.error('Error in setup process:', err)
+  }
+  finally {
+    atlasIsLoading.value = false
   }
   window.addEventListener('resize', handleResize)
   window.addEventListener('keydown', handleKeyDown)
@@ -1068,7 +1089,7 @@ watch(
   async (newProjFile) => {
     if (newProjFile) {
       try {
-        const response = await fetch(`/data/projections/${newProjFile}`)
+        const response = await fetch(`api/file/projections/${newProjFile}`)
         if (!response.ok)
           throw new Error('Failed to fetch projection data.')
         const projectionData = await response.json()
@@ -1188,6 +1209,24 @@ defineExpose({
 
 <template>
   <div class="relative h-full w-full">
+    <!-- loading overlay while the scene is being prepared -->
+    <v-overlay
+      :model-value="atlasIsLoading" persistent class="align-center justify-center" absolute
+      style="backdrop-filter: blur(2px)"
+    >
+      <div class="flex flex-col items-center justify-center">
+        <v-progress-circular indeterminate color="primary" size="64" width="6" />
+        <div class="mt-4 max-w-xs text-center text-gray-700 dark:text-gray-200">
+          <p>
+            Preparing interactive atlas display...
+            <br>
+            <span class="text-sm">
+              (Loading may take a while for large collections)
+            </span>
+          </p>
+        </div>
+      </div>
+    </v-overlay>
     <canvas ref="canvas" />
 
     <!-- Collapsible Controls panel -->
@@ -1200,13 +1239,9 @@ defineExpose({
       <!-- Toggle button -->
       <button
         class="absolute top-2 h-8 w-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-700 shadow-md -left-6 dark:bg-gray-700 hover:bg-gray-300 dark:text-gray-200 dark:hover:bg-gray-600"
-        :title="isControlsOpen ? 'Collapse controls' : 'Expand controls'"
-        @click="isControlsOpen = !isControlsOpen"
+        :title="isControlsOpen ? 'Collapse controls' : 'Expand controls'" @click="isControlsOpen = !isControlsOpen"
       >
-        <v-icon
-          :icon="isControlsOpen ? 'mdi-chevron-right' : 'mdi-chevron-left'"
-          size="large"
-        />
+        <v-icon :icon="isControlsOpen ? 'mdi-chevron-right' : 'mdi-chevron-left'" size="large" />
       </button>
 
       <!-- Panel content - shown when open -->
@@ -1221,14 +1256,8 @@ defineExpose({
             <span class="text-sm">Global Spread</span>
           </div>
           <v-slider
-            v-model="spreadFactor"
-            :min="1"
-            :max="6"
-            :step="0.1"
-            density="compact"
-            color="primary"
-            hide-details
-            thumb-label
+            v-model="spreadFactor" :min="1" :max="6" :step="0.1" density="compact" color="primary"
+            thumb-label hide-details
           />
           <div class="mt-1 flex justify-between text-xs">
             <span>Compact</span>
@@ -1242,14 +1271,8 @@ defineExpose({
             <span class="text-sm">Repulsion Force</span>
           </div>
           <v-slider
-            v-model="repulsionStrength"
-            :min="0"
-            :max="6"
-            :step="0.1"
-            density="compact"
-            color="secondary"
-            hide-details
-            thumb-label
+            v-model="repulsionStrength" :min="0" :max="6" :step="0.1" density="compact" color="secondary"
+            hide-details thumb-label
           />
           <div class="mt-1 flex justify-between text-xs">
             <span>Weak</span>
@@ -1264,13 +1287,7 @@ defineExpose({
             <span class="text-sm">Image Size</span>
           </div>
           <v-slider
-            v-model="imageSize"
-            :min="0.5"
-            :max="6"
-            :step="0.1"
-            density="compact"
-            color="success"
-            hide-details
+            v-model="imageSize" :min="0.5" :max="6" :step="0.1" density="compact" color="success" hide-details
             thumb-label
           />
           <div class="mt-1 flex justify-between text-xs">
@@ -1288,10 +1305,8 @@ defineExpose({
 
       <!-- Collapsed state - vertical text -->
       <div
-        v-else
-        class="h-full w-full flex flex-col cursor-pointer items-center justify-center"
-        title="Click to expand controls"
-        @click="isControlsOpen = true"
+        v-else class="h-full w-full flex flex-col cursor-pointer items-center justify-center"
+        title="Click to expand controls" @click="isControlsOpen = true"
       >
         <div class="vertical-text text-xs font-medium">
           Controls

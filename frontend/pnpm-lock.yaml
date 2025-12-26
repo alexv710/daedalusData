@@ -16,6 +16,9 @@ importers:
       d3:
         specifier: ^7.9.0
         version: 7.9.0
+      maxrects-packer:
+        specifier: ^2.7.3
+        version: 2.7.3
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
@@ -5079,6 +5082,9 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
+
+  maxrects-packer@2.7.3:
+    resolution: {integrity: sha512-bG6qXujJ1QgttZVIH4WDanhoJtvbud/xP/XPyf6A69C9RdA61BM4TomFALCq2nrTa+tARRIBB4LuIFsnUQU2wA==}
 
   mdast-util-find-and-replace@3.0.2:
     resolution: {integrity: sha512-Tmd1Vg/m3Xz43afeNxDIhWRtFZgM2VLyaf4vSTYwudTyeuTneoL3qtWMA5jeLyz/O1vDJmmV4QuScFCA2tBPwg==}
@@ -13304,6 +13310,8 @@ snapshots:
   marked@12.0.2: {}
 
   math-intrinsics@1.1.0: {}
+
+  maxrects-packer@2.7.3: {}
 
   mdast-util-find-and-replace@3.0.2:
     dependencies:
