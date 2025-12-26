@@ -1,3 +1,9 @@
+## [1.0.0-dev.6](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.5...v1.0.0-dev.6) (2025-12-26)
+
+### Bug Fixes
+
+* upgrade @rollup/rollup-linux-x64-gnu from 4.9.5 to 4.53.3 ([f4e20a5](https://github.com/alexv710/daedalusData/commit/f4e20a535bd2a24602b66654730953d6f7bfefe4))
+
 ## [1.0.0-dev.5](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.4...v1.0.0-dev.5) (2025-04-19)
 
 ### Features
