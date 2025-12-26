@@ -55,6 +55,8 @@ That's it! Everything else runs inside Docker, so you don't need to worry about 
 git clone git@github.com:alexv710/daedalusData.git
 cd daedalusdata
 docker compose up -d
+# or
+podman-compose up -d
 ```
 
 This starts two services:
@@ -301,6 +303,35 @@ The web interface provides tools for:
 - Exporting labeled datasets
 
 Access the frontend at [http://localhost:3000](http://localhost:3000).
+
+## Testing
+
+DaedalusData includes test suites for both the Python data processing and the frontend application.
+
+### Python Tests
+
+Validate data formats and structures:
+
+```bash
+# Run from project root
+pytest
+
+# Or inside Docker/Podman
+docker compose exec app python -m pytest /app/tests
+podman-compose exec app python -m pytest /app/tests
+```
+
+### Frontend Tests
+
+Test the Nuxt.js API routes and components:
+
+```bash
+cd frontend
+pnpm test        # Run tests
+pnpm test:ci     # Run with coverage
+```
+
+See [tests/README.md](tests/README.md) for more details.
 
 ## Extending DaedalusData
 

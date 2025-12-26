@@ -11,6 +11,8 @@ services:
       - ./notebooks:/app/notebooks
       - ./data:/app/data
       - ./backend:/app/backend
+      - ./tests:/app/tests
+      - ./pytest.ini:/app/pytest.ini
       - node_modules:/app/frontend/node_modules
       - pnpm_store:/app/frontend/.pnpm-store
     environment:
