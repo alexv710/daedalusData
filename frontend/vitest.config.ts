@@ -4,11 +4,12 @@ import { defineVitestConfig } from '@nuxt/test-utils/config'
 export default defineVitestConfig({
   test: {
     globals: true,
-    environment: 'happy-dom',
+    environment: 'nuxt',
     include: ['server/**/*.test.ts', 'server/**/*.spec.ts', 'app/**/*.test.ts', 'app/**/*.spec.ts'],
     environmentOptions: {
       nuxt: {
         rootDir: fileURLToPath(new URL('.', import.meta.url)),
+        domEnvironment: 'happy-dom',
         overrides: {
         },
         mock: {
@@ -28,10 +29,12 @@ export default defineVitestConfig({
         'app/components/icons/**',
       ],
     },
-    deps: {
-      inline: [
-        'pinia',
-      ],
+    server: {
+      deps: {
+        inline: [
+          'pinia',
+        ],
+      },
     },
     alias: {
       '~/': fileURLToPath(new URL('./app/', import.meta.url)),

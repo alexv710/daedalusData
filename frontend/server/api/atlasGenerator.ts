@@ -206,11 +206,11 @@ async function applyScalingAndCreateImageInfo(
 async function packImageRects(
   imageInfos: ImageProcessingInfo[],
 ): Promise<{
-    bins: Array<{ width: number, height: number, rects: ImageProcessingInfo[] }>
-    packedRects: ImageProcessingInfo[]
-    atlasWidth: number
-    atlasHeight: number
-  }> {
+  bins: Array<{ width: number, height: number, rects: ImageProcessingInfo[] }>
+  packedRects: ImageProcessingInfo[]
+  atlasWidth: number
+  atlasHeight: number
+}> {
   const packerOptions = {
     smart: true,
     pot: false,

@@ -1,3 +1,27 @@
+## [1.0.0-dev.7](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.6...v1.0.0-dev.7) (2025-12-26)
+
+### Features
+
+* implement file handling API with content type support ([e80816e](https://github.com/alexv710/daedalusData/commit/e80816e79aa54c289df7546b8e90c759d48b8583))
+
+### Bug Fixes
+
+* bind stepper item values to ensure proper functionality ([a33a106](https://github.com/alexv710/daedalusData/commit/a33a10606879ceed57e813810e5e2a8f66ca066c))
+* reorder attributes in button element for consistency ([cf5ca08](https://github.com/alexv710/daedalusData/commit/cf5ca08ac5895792a7fa9701645e9169f3a68235))
+* update CodeQL action to version 4 for improved analysis ([9effcb3](https://github.com/alexv710/daedalusData/commit/9effcb3682f1df129e3a34bfe78f5b98a92acc19))
+* update docker-compose configuration and improve pnpm handling ([1e703b1](https://github.com/alexv710/daedalusData/commit/1e703b13b14cf6e31b393116ff502473c48768c9))
+* update happy-dom dependency to version 20.0.11 ([d0e991b](https://github.com/alexv710/daedalusData/commit/d0e991ba9eba7f3de36c0f4b54879d167edc757d))
+* update Jupyter Notebook token to empty string for security ([c94de80](https://github.com/alexv710/daedalusData/commit/c94de80576b292d1b543c2a1c93b81258d28160a))
+* update numpy version constraint for compatibility ([a3dbb9c](https://github.com/alexv710/daedalusData/commit/a3dbb9cf845486ac4e5b4ae31914b33ee17a3d95))
+* update postinstall script and adjust test environment settings ([e424081](https://github.com/alexv710/daedalusData/commit/e424081c9529cbf0c120271723a501a32c5c08a6))
+* **deps:** update requests and urllib3 to address security vulnerabilities ([2efdcc7](https://github.com/alexv710/daedalusData/commit/2efdcc74463d014fc30dea103c899be6ebd7e23e))
+
+## [1.0.0-dev.6](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.5...v1.0.0-dev.6) (2025-12-26)
+
+### Bug Fixes
+
+* upgrade @rollup/rollup-linux-x64-gnu from 4.9.5 to 4.53.3 ([f4e20a5](https://github.com/alexv710/daedalusData/commit/f4e20a535bd2a24602b66654730953d6f7bfefe4))
+
 ## [1.0.0-dev.5](https://github.com/alexv710/daedalusData/compare/v1.0.0-dev.4...v1.0.0-dev.5) (2025-04-19)
 
 ### Features
