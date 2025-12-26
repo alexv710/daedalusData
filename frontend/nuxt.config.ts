@@ -77,6 +77,14 @@ export default defineNuxtConfig({
     ],
   },
 
+  vite: {
+    server: {
+      watch: {
+        ignored: ['**/.pnpm-store/**', '**/node_modules/**'],
+      },
+    },
+  },
+
   eslint: {
     config: {
       standalone: false,
