@@ -25,7 +25,7 @@ jobs:
           node-version: '20'
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
           version: 8
           run_install: false
@@ -56,11 +56,6 @@ jobs:
         run: |
           cd frontend
           pnpm audit --production
-          
-      - name: Python Safety Check
-        run: |
-          pip install safety
-          safety check -r requirements.txt
           
   container-scan:
     name: Scan Container

@@ -18,7 +18,7 @@ function onSelect(value: string) {
 
 <template>
   <v-card outlined class="ma-0 pa-0" style="max-width:600px; margin:auto;">
-    <v-card-title class="text-h6 justify-space-between align-center">
+    <v-card-title class="text-h6 align-center justify-space-between">
       <span>Projection</span>
     </v-card-title>
     <v-card-text class="ma-0 pa-1">

@@ -12,6 +12,13 @@ interface DatasetInfo {
   projections: FileInfo[]
 }
 
+interface AtlasStatus {
+  status: 'idle' | 'in_progress' | 'complete' | 'error'
+  progress: number
+  message: string
+  lastUpdated: string
+}
+
 const dataset = ref<DatasetInfo>({
   images: [],
   metadata: [],
@@ -23,6 +30,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const atlasExists = ref(false)
 const activeStep = ref(0)
+const atlasFilename = 'atlas.webp'
 const steps = [
   { name: 'Images', completed: false, icon: 'mdi-image-multiple', tooltip: 'Add images to your dataset' },
   { name: 'Metadata', completed: false, icon: 'mdi-file-document-outline', tooltip: 'Add metadata for your images' },
@@ -36,7 +44,7 @@ const atlasGenerating = ref(false)
 const atlasProgress = ref(0)
 const atlasProgressMessage = ref('')
 const atlasError = ref<string | null>(null)
-const atlasStatusInterval = ref<number | null>(null)
+const atlasStatusInterval = ref<number | null>(0)
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024)
@@ -68,26 +76,27 @@ function checkStepStatus() {
 }
 
 function checkAtlasExists() {
+  let atlasImageExists = false
+
   // Perform a HEAD request to check for the atlas file
-  fetch('/data/atlas.png', {
+  fetch(`api/file/${atlasFilename}`, {
     method: 'HEAD',
-    // Add cache-busting to ensure we're not getting cached responses
     headers: { 'Cache-Control': 'no-cache' },
   })
-    .then((res) => {
-      atlasExists.value = res.ok
-      if (res.ok) {
-        // Also check for atlas.json to ensure the metadata exists
-        return fetch('/data/atlas.json', {
+    .then((resAtlasImage) => {
+      atlasImageExists = resAtlasImage.ok
+      if (resAtlasImage.ok) {
+        // Check for atlas.json to ensure the metadata exists
+        return fetch('api/file/atlas.json', {
           method: 'HEAD',
           headers: { 'Cache-Control': 'no-cache' },
         })
       }
       return Promise.resolve({ ok: false })
     })
-    .then((res) => {
+    .then((resJsonData) => {
       // Only mark as complete if both image and json exist
-      atlasExists.value = atlasExists.value && res.ok
+      atlasExists.value = atlasImageExists && resJsonData.ok
       checkStepStatus()
     })
     .catch((error) => {
@@ -102,57 +111,49 @@ function startAtlasGeneration() {
     return
 
   atlasGenerating.value = true
-  atlasProgress.value = 5
-  atlasProgressMessage.value = 'Starting atlas generation...'
+  atlasProgress.value = 0
+  atlasProgressMessage.value = 'Initiating atlas generation...'
   atlasError.value = null
 
   // Start the atlas generation process
   fetch('/api/atlasGenerator', {
     method: 'POST',
   })
-    .then((res) => {
-      if (!res.ok)
-        throw new Error('Failed to generate atlas')
-      return res.json()
-    })
-    .then(() => {
-      // Set to 100% complete
-      atlasProgress.value = 100
-      atlasProgressMessage.value = 'Atlas generation complete!'
-
-      // Re-check if the atlas now exists
-      setTimeout(() => {
-        checkAtlasExists()
-        atlasGenerating.value = false
-        stopPollingAtlasStatus()
-      }, 1000)
+    .then(async (res) => {
+      if (res.status === 409) {
+        const data = await res.json()
+        throw new Error(data.message || 'Atlas generation already in progress.')
+      }
+      if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(`Failed to start atlas generation: ${res.status} ${res.statusText}. ${errorText}`)
+      }
+      // Status 202 Accepted
+      atlasProgressMessage.value = 'Generation started, monitoring progress...'
+      startPollingAtlasStatus()
     })
     .catch((e) => {
-      console.error('Failed to generate atlas:', e)
-      atlasError.value = `Failed to generate atlas: ${e.message || 'Unknown error'}`
+      console.error('Failed to initiate atlas generation:', e)
       atlasGenerating.value = false
       stopPollingAtlasStatus()
     })
-
-  // Start polling for status updates
-  startPollingAtlasStatus()
 }
 
 function startPollingAtlasStatus() {
   // Poll for atlas generation status every 2 seconds
-  if (atlasStatusInterval.value)
+  if (atlasStatusInterval.value) {
     clearInterval(atlasStatusInterval.value)
+  }
 
   atlasStatusInterval.value = window.setInterval(() => {
     fetch('/api/atlasStatus')
       .then(res => res.json())
-      .then((data) => {
+      .then((data?: AtlasStatus) => {
         if (data.status === 'in_progress') {
           atlasProgress.value = data.progress || Math.min(90, atlasProgress.value + 5)
           atlasProgressMessage.value = data.message || 'Processing images...'
         }
         else if (data.status === 'error') {
-          atlasError.value = data.error || 'An error occurred during atlas generation'
           atlasGenerating.value = false
           stopPollingAtlasStatus()
         }
@@ -162,11 +163,11 @@ function startPollingAtlasStatus() {
           atlasGenerating.value = false
           stopPollingAtlasStatus()
           checkAtlasExists()
+          refreshPage()
         }
       })
       .catch((err) => {
         console.error('Error checking atlas status:', err)
-        // Don't stop polling on network errors, just try again next interval
       })
   }, 2000)
 }
@@ -318,7 +319,7 @@ onUnmounted(() => {
 
             <v-stepper-window>
               <!-- Step 1: Images -->
-              <v-stepper-window-item value="0">
+              <v-stepper-window-item :value="0">
                 <v-card-text>
                   <h2 class="mb-4 text-xl font-semibold">
                     Add Images to Your Dataset
@@ -332,12 +333,12 @@ onUnmounted(() => {
 
                     <div class="grid grid-cols-2 mt-4 gap-4 lg:grid-cols-6 md:grid-cols-4">
                       <div
-                        v-for="image in dataset.images.slice(0, 6)"
+                        v-for="image in dataset.images.slice(0, 12)"
                         :key="image.name"
                         class="aspect-square border rounded-lg p-2 transition-shadow hover:shadow-lg"
                       >
                         <img
-                          :src="`data/images/${image.name}`"
+                          :src="`/api/file/images/${image.name}`"
                           :alt="image.name"
                           class="h-full w-full object-contain"
                         >
@@ -371,7 +372,7 @@ onUnmounted(() => {
               </v-stepper-window-item>
 
               <!-- Step 2: Metadata -->
-              <v-stepper-window-item value="1">
+              <v-stepper-window-item :value="1">
                 <v-card-text>
                   <h2 class="mb-4 text-xl font-semibold">
                     Add Metadata for Your Images
@@ -434,7 +435,7 @@ onUnmounted(() => {
               </v-stepper-window-item>
 
               <!-- Step 3: Features -->
-              <v-stepper-window-item value="2">
+              <v-stepper-window-item :value="2">
                 <v-card-text>
                   <h2 class="mb-4 text-xl font-semibold">
                     Extract Features from Your Images
@@ -491,7 +492,7 @@ onUnmounted(() => {
               </v-stepper-window-item>
 
               <!-- Step 4: Projections -->
-              <v-stepper-window-item value="3">
+              <v-stepper-window-item :value="3">
                 <v-card-text>
                   <h2 class="mb-4 text-xl font-semibold">
                     Calculate Dimensionality Reductions
@@ -548,13 +549,41 @@ onUnmounted(() => {
               </v-stepper-window-item>
 
               <!-- Step 5: Atlas -->
-              <v-stepper-window-item value="4">
+              <v-stepper-window-item :value="4">
                 <v-card-text>
                   <h2 class="mb-4 text-xl font-semibold">
                     Generate Image Atlas
                   </h2>
 
-                  <div v-if="atlasExists" class="mb-4">
+                  <div v-if="atlasGenerating" class="mb-4">
+                    <v-alert
+                      type="info"
+                      variant="tonal"
+                      class="mb-4"
+                    >
+                      {{ atlasExists ? 'Regenerating atlas...' : 'Generating atlas for the first time...' }}
+                    </v-alert>
+
+                    <p class="mb-2">
+                      {{ atlasProgressMessage }}
+                    </p>
+                    <v-progress-linear
+                      v-model="atlasProgress"
+                      color="primary"
+                      height="20"
+                      striped
+                    >
+                      <template #default>
+                        {{ Math.ceil(atlasProgress) }}%
+                      </template>
+                    </v-progress-linear>
+                    <p class="mt-2 text-sm text-gray-600">
+                      This may take a few minutes for large datasets...
+                    </p>
+                  </div>
+
+                  <!-- Only show this when atlas exists and not generating -->
+                  <div v-else-if="atlasExists" class="mb-4">
                     <v-alert type="success" variant="tonal">
                       Atlas has been generated successfully.
                     </v-alert>
@@ -564,19 +593,10 @@ onUnmounted(() => {
                         Atlas Preview
                       </h3>
                       <img
-                        v-if="atlasExists"
-                        :src="`/data/atlas.png?t=${Date.now()}`"
+                        :src="`/api/file/${atlasFilename}`"
                         alt="Atlas"
                         class="h-64 w-full border rounded object-contain"
                       >
-                      <div
-                        v-else
-                        class="h-64 w-full flex items-center justify-center border rounded bg-gray-100"
-                      >
-                        <p class="text-gray-500">
-                          Atlas preview not available
-                        </p>
-                      </div>
                     </div>
 
                     <div class="mt-4 flex flex-wrap gap-2">
@@ -599,18 +619,10 @@ onUnmounted(() => {
                     </div>
                   </div>
 
+                  <!-- Show this when no atlas exists and not generating -->
                   <div v-else>
                     <v-alert
-                      v-if="atlasError"
-                      type="error"
-                      variant="tonal"
-                      class="mb-4"
-                    >
-                      {{ atlasError }}
-                    </v-alert>
-
-                    <v-alert
-                      v-else
+                      v-if="atlasExists"
                       type="info"
                       variant="tonal"
                       class="mb-4"
@@ -618,26 +630,7 @@ onUnmounted(() => {
                       No atlas found. Generate an atlas to optimize image loading and visualization.
                     </v-alert>
 
-                    <div v-if="atlasGenerating" class="mt-4">
-                      <p class="mb-2">
-                        {{ atlasProgressMessage }}
-                      </p>
-                      <v-progress-linear
-                        v-model="atlasProgress"
-                        color="primary"
-                        height="20"
-                        striped
-                      >
-                        <template #default>
-                          {{ Math.ceil(atlasProgress) }}%
-                        </template>
-                      </v-progress-linear>
-                      <p class="mt-2 text-sm text-gray-600">
-                        This may take a few minutes for large datasets...
-                      </p>
-                    </div>
-
-                    <div v-else class="mt-4">
+                    <div class="mt-4">
                       <p>The atlas combines all images into a single file for efficient loading and display.</p>
 
                       <v-btn
