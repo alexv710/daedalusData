@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { createError, defineEventHandler, sendStream } from 'h3'
+import { defineEventHandler, send, sendStream, setResponseStatus } from 'h3'
 
 const CONTENT_TYPE_MAP: Record<string, string> = {
   '.png': 'image/png',
@@ -32,11 +32,8 @@ export default defineEventHandler(async (event) => {
   const requestedRelativePath = Array.isArray(rawParams) ? rawParams.join('/') : rawParams || ''
 
   if (!requestedRelativePath) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'No file path specified in the request.',
-    })
+    setResponseStatus(event, 400, 'Bad Request')
+    return send(event, 'No file path specified')
   }
 
   const finalPath = path.join(DATA_ROOT, requestedRelativePath)
@@ -44,11 +41,8 @@ export default defineEventHandler(async (event) => {
   const relativeFromRoot = path.relative(DATA_ROOT, finalPath)
   if (relativeFromRoot.startsWith('..') || path.isAbsolute(relativeFromRoot)) {
     console.warn(`Potential path traversal attempt: ${requestedRelativePath} resolved outside DATA_ROOT`)
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Bad Request',
-      message: 'Invalid file path requested.',
-    })
+    setResponseStatus(event, 400, 'Bad Request')
+    return send(event, 'Invalid file path')
   }
 
   let stats: fs.Stats
@@ -56,30 +50,25 @@ export default defineEventHandler(async (event) => {
     stats = await fs.promises.stat(finalPath)
 
     if (!stats.isFile()) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Bad Request',
-        message: 'Requested path is not a file.',
-      })
+      setResponseStatus(event, 400, 'Bad Request')
+      return send(event, 'Not a file')
     }
   }
   catch (error: any) {
+    // Re-throw if it's already a handled error
+    if (error.statusCode) {
+      throw error
+    }
     // Handle file not found specifically
     if (error.code === 'ENOENT') {
       console.warn(`File not found: ${finalPath}`)
-      throw createError({
-        statusCode: 404,
-        statusMessage: 'Not Found',
-        message: 'The requested file could not be found.',
-      })
+      setResponseStatus(event, 404, 'Not Found')
+      return send(event, 'File not found')
     }
     // Handle other potential errors (permissions, etc.)
     console.error(`Error accessing file ${finalPath}:`, error)
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal Server Error',
-      message: 'Could not access the requested file due to a server error.',
-    })
+    setResponseStatus(event, 500, 'Internal Server Error')
+    return send(event, 'Server error')
   }
 
   const extension = path.extname(finalPath).toLowerCase()

@@ -11,19 +11,24 @@ services:
       - ./notebooks:/app/notebooks
       - ./data:/app/data
       - ./backend:/app/backend
+      - ./tests:/app/tests
+      - ./pytest.ini:/app/pytest.ini
       - node_modules:/app/frontend/node_modules
+      - pnpm_store:/app/frontend/.pnpm-store
     environment:
       - NODE_ENV=development
-      - JUPYTER_TOKEN=daedalus-dev
+      - JUPYTER_TOKEN=''
+      - CHOKIDAR_USEPOLLING=true
     command: >
       sh -c "rm -f /tmp/nitro/worker*.sock && 
       jupyter notebook 
       --ip=0.0.0.0 
       --allow-root 
       --no-browser 
-      --NotebookApp.token=daedalus-dev 
+      --NotebookApp.token=''
       --notebook-dir=/app/notebooks & 
-      cd frontend && pnpm install && pnpm run dev"
+      cd frontend && pnpm install --prefer-offline && pnpm run dev --host 0.0.0.0"
 
 volumes:
   node_modules:
+  pnpm_store:
