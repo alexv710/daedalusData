@@ -38,7 +38,7 @@
   "devDependencies": {
     "@antfu/eslint-config": "^4.1.1",
     "@commitlint/cli": "^19.8.0",
-    "@commitlint/config-conventional": "^19.8.0",
+    "@commitlint/config-conventional": "^20.2.0",
     "@eslint/js": "^9.21.0",
     "@iconify-json/carbon": "^1.2.6",
     "@iconify-json/twemoji": "^1.2.2",
