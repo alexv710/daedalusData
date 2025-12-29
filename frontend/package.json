@@ -30,7 +30,7 @@
     "maxrects-packer": "^2.7.3",
     "sharp": "^0.33.5",
     "three": "^0.182.0",
-    "uuid": "^11.1.0"
+    "uuid": "^13.0.0"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "4.54.0"
