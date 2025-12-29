@@ -52,7 +52,7 @@
     "@semantic-release/git": "^10.0.1",
     "@unocss/eslint-config": "^66.5.11",
     "@unocss/nuxt": "^66.5.11",
-    "@vite-pwa/nuxt": "^0.10.6",
+    "@vite-pwa/nuxt": "^1.1.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vitest/coverage-v8": "^3.0.8",
     "@vitest/ui": "^3.0.8",
