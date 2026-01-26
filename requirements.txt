@@ -1,6 +1,6 @@
 
 numpy>=1.26.0,<2.1.0
-pandas==2.2.3
+pandas==3.0.0
 pillow==11.1.0
 tensorflow==2.18.0
 umap-learn==0.5.8
