@@ -47,13 +47,30 @@ DaedalusData is designed to be extremely easy to set up and use. The only prereq
 
 That's it! Everything else runs inside Docker, so you don't need to worry about dependencies, Python versions, or library conflicts.
 
+### Supported Platforms
+
+DaedalusData ships as Linux containers, so it runs on any host where Docker (or Podman) can run Linux containers:
+
+| Platform | Status |
+|----------|--------|
+| Linux (x86_64) | Tested in CI on every commit |
+| macOS (Apple silicon), Docker Desktop or Podman | Tested manually during development |
+| Windows 10/11, Docker Desktop with WSL 2 backend | Expected to work, not regularly tested |
+| Windows containers | Not supported |
+
+Notes for Windows:
+
+- Docker Desktop must run in Linux container mode with the [WSL 2 backend](https://docs.docker.com/desktop/features/wsl/) (the default on current versions). Windows container mode will fail with a manifest error, since no Windows images are published.
+- Clone and run the project from inside the WSL 2 filesystem (e.g. `~/daedalusData` in your Ubuntu distribution) rather than a Windows path like `C:\Users\...`. Bind mounts of Windows paths are slow and are the most common source of startup failures.
+- If you hit a problem on a platform listed above, please [open an issue](https://github.com/alexv710/daedalusData/issues) with your OS and Docker version.
+
 ### Quick Start
 
 #### 1. Clone & Launch
 
 ```bash
-git clone git@github.com:alexv710/daedalusData.git
-cd daedalusdata
+git clone https://github.com/alexv710/daedalusData.git
+cd daedalusData
 docker compose up -d
 # or
 podman-compose up -d
