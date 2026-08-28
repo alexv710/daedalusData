@@ -2,7 +2,7 @@ FROM node:23-slim as dev
 WORKDIR /app
 
 # Install pnpm with minimal cache
-RUN npm install -g pnpm && npm cache clean --force
+RUN npm install -g pnpm@9.15.4 && npm cache clean --force
 
 # Install minimal Python and dependencies
 RUN apt-get update && apt-get install -y \
