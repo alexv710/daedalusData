@@ -1,10 +1,4 @@
-## [1.0.1-dev.2](https://github.com/alexv710/daedalusData/compare/v1.0.1-dev.1...v1.0.1-dev.2) (2026-08-30)
-
-### Bug Fixes
-
-* **deps:** update sharp and uuid to patched versions ([ca746fb](https://github.com/alexv710/daedalusData/commit/ca746fbc4b74a69b44ccc63c7cd20a6c8b852311))
-
-## [1.0.1-dev.1](https://github.com/alexv710/daedalusData/compare/v1.0.0...v1.0.1-dev.1) (2026-08-30)
+## [1.0.1](https://github.com/alexv710/daedalusData/compare/v1.0.0...v1.0.1) (2026-08-30)
 
 ### Bug Fixes
 
