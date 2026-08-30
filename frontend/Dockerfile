@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build-stage
+FROM node:24-alpine AS build-stage
 
 WORKDIR /app
 RUN corepack enable
@@ -21,7 +21,7 @@ ENV NITRO_PRESET=node-server
 RUN pnpm nuxt build --prerender=false
 
 # SSR
-FROM node:20-alpine AS production-stage
+FROM node:24-alpine AS production-stage
 
 WORKDIR /app
 
