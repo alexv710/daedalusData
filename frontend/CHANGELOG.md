@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/alexv710/daedalusData/compare/v1.0.0...v1.0.1) (2026-08-30)
+
+### Bug Fixes
+
+* create data directories on clone and drop stale backend mount ([e47010d](https://github.com/alexv710/daedalusData/commit/e47010d36634640aeef64982693a206b162e8018))
+* pin pnpm to the version declared in package.json ([3a99bc3](https://github.com/alexv710/daedalusData/commit/3a99bc30c5176de72fbf4d652db6d98963b90b64))
+
 ## 1.0.0 (2025-12-26)
 
 ### Features
