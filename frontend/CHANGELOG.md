@@ -1,3 +1,5 @@
+## [1.0.2-dev.2](https://github.com/alexv710/daedalusData/compare/v1.0.2-dev.1...v1.0.2-dev.2) (2026-09-05)
+
 ## [1.0.2-dev.1](https://github.com/alexv710/daedalusData/compare/v1.0.1...v1.0.2-dev.1) (2026-08-30)
 
 ### Bug Fixes
