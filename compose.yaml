@@ -4,8 +4,8 @@ services:
       context: .
       target: dev
     ports:
-      - "3000:3000"
-      - "8888:8888"
+      - "${FRONTEND_PORT:-3000}:3000"
+      - "${JUPYTER_PORT:-8888}:8888"
     volumes:
       - ./frontend:/app/frontend
       - ./notebooks:/app/notebooks

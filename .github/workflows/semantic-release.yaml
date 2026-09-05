@@ -16,7 +16,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -34,9 +34,9 @@ jobs:
           node-version: '24'
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
-          version: 8
+          package_json_file: frontend/package.json
           run_install: false
 
       - name: Get pnpm store directory
@@ -63,16 +63,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd frontend
-          pnpm install
-          pnpm add -D semantic-release @semantic-release/changelog @semantic-release/git conventional-changelog-conventionalcommits
-
-      - name: Update package.json
-        run: |
-          cd frontend
-          # Ensure the repository field is correct in package.json
-          jq '.repository = {"type":"git","url":"https://github.com/alexv710/daedalusData.git"}' package.json > package.json.tmp
-          mv package.json.tmp package.json
-          cat package.json
+          pnpm install --frozen-lockfile
 
       - name: Verify .releaserc.json exists
         run: |

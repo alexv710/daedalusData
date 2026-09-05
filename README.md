@@ -113,6 +113,7 @@ Open Jupyter at **[http://localhost:8888](http://localhost:8888)** and run the f
 The application is configured through the `compose.yaml` file. Key configuration options:
 
 - Volume mounts for data directories
+- Host ports: if 3000 or 8888 are taken on your machine, put `FRONTEND_PORT=3010` and/or `JUPYTER_PORT=8889` (or any free ports) in a `.env` file next to `compose.yaml`
 
 ## Data Organization
 
