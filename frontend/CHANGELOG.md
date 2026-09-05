@@ -1,12 +1,4 @@
-## [1.1.0-dev.1](https://github.com/alexv710/daedalusData/compare/v1.0.2-dev.2...v1.1.0-dev.1) (2026-09-05)
-
-### Features
-
-* make host ports configurable via env ([e0ed2ad](https://github.com/alexv710/daedalusData/commit/e0ed2add8070520133606b9a7055c1925b0b4ebb))
-
-## [1.0.2-dev.2](https://github.com/alexv710/daedalusData/compare/v1.0.2-dev.1...v1.0.2-dev.2) (2026-09-05)
-
-## [1.0.2-dev.1](https://github.com/alexv710/daedalusData/compare/v1.0.1...v1.0.2-dev.1) (2026-08-30)
+## [1.0.2](https://github.com/alexv710/daedalusData/compare/v1.0.1...v1.0.2) (2026-08-30)
 
 ### Bug Fixes
 
