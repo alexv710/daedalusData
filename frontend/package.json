@@ -74,7 +74,7 @@
     "typescript-eslint": "^8.50.1",
     "vitest": "^3.0.8",
     "vue-tsc": "^2.2.0",
-    "vuetify-nuxt-module": "^0.18.3"
+    "vuetify-nuxt-module": "^0.19.5"
   },
   "resolutions": {
     "@nuxt/devtools": "^2.0.0",
