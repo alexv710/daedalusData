@@ -33,7 +33,7 @@
     "uuid": "^13.0.0"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "4.54.0"
+    "@rollup/rollup-linux-x64-gnu": "4.63.1"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.1.1",
