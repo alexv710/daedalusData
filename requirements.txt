@@ -1,5 +1,5 @@
 
-numpy>=1.26.0,<2.5.0
+numpy>=2.5.3,<2.6.0
 pandas==3.0.5
 pillow==12.3.0
 tensorflow==2.21.0
