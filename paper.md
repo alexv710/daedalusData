@@ -25,23 +25,31 @@ bibliography: paper.bib
 
 # Summary
 
-DaedalusData is an open-source visual analytics platform designed for interactive exploration, knowledge externalization, and labeling of large image collections. It provides researchers and data scientists with a flexible and accessible environment for analyzing image datasets without requiring advanced technical skills. The system combines dimensionality reduction techniques for visual exploration with interactive filtering and selection tools, enabling users to label images efficiently and externalize their domain knowledge through customizable label alphabets. DaedalusData is fully dockerized for easy deployment and includes integrated Jupyter notebooks for feature extraction and dimensionality reduction, making it accessible to users without extensive programming or infrastructure expertise.
+DaedalusData is an open-source platform for exploring and labeling large image collections. It combines two-dimensional projections of image content and metadata with interactive filtering, selection and labeling in one web interface, and ships as a Docker Compose setup with Jupyter notebooks for feature extraction and projection. The tool grew out of a design study with domain experts in medical manufacturing [@wyss2025daedalusdata]. It is built for the phase of an analysis in which the categories of interest are not known yet and have to be worked out by looking at the data.
 
-# Statement of Need
+# Statement of need
 
-The visual exploration and labeling of large image collections is a common challenge across diverse scientific fields. Researchers frequently need to analyze thousands of images, discover patterns, extract knowledge, and create labeled datasets for downstream analysis. While numerous tools exist for specific aspects of this workflow, there remains a gap. DaedalusData fills this gap for analysis tasks that are in a very explorative phase, where the user still needs to develop the label alphabets and explore the data to understand the patterns.
+Many scientific image collections arrive without a taxonomy. Before a classifier can be trained or an annotation campaign planned, someone has to look at thousands of images, work out which patterns recur, and turn them into a set of labels. That person is usually a domain expert, not a programmer. Tools for this phase tend to fall on one of two sides: they either project a collection into two dimensions and let the user look at it, or they let the user apply a label schema that already exists. Moving between the two means exporting, scripting and re-importing, which is the part a domain expert cannot be expected to do.
 
-Existing image exploration tools often require significant technical expertise to install and operate, focus exclusively on either visual exploration or labeling (through active learning), or lack the flexibility needed for domain-specific adaptations. Commercial tools can be expensive and closed-source, limiting accessibility and customization. Meanwhile, custom implementations require considerable development effort and often result in solutions that aren't generalizable across disciplines.
+DaedalusData targets this pre-taxonomy phase. It provides:
 
-DaedalusData addresses these challenges by providing a unified, accessible platform that enables researchers to:
+1. Projections of an image collection from image features, metadata, or both, rendered as thumbnails rather than points so that clusters can be judged by eye.
+2. Label alphabets: named sets of labels that are created, extended and reorganized while looking at the data. Several alphabets can coexist over the same collection.
+3. Selection tools, such as lasso selection and metadata filters, for labeling many images at once.
+4. Label-informed projections: an alphabet can be appended to the image features as additional attributes, so the layout reorganizes around what the expert has already externalized and exposes what is still unresolved.
+5. A file-based data layout on mounted volumes and a Docker Compose setup, so that no database, server or Python environment has to be installed and the data stays under the user's control.
 
-1. Explore large image collections through interactive visualizations based on image content and metadata
-2. Create and maintain multiple label alphabets that reflect diverse domain perspectives
-3. Efficiently label images through interactive selection tools and similarity-preserving projections
-4. Externalize expert knowledge through semi-supervised label-informed projections
-5. Deploy the entire system with minimal setup via Docker, requiring no specialized infrastructure
+# State of the field
 
-By combining these capabilities in an easy-to-deploy package, DaedalusData democratizes access to sophisticated image analysis techniques, enabling researchers across disciplines to gain insights from their image collections more efficiently.
+**ImageJ and the bio-image tools.** In the ImageJ ecosystem [@schindelin2012fiji] the individual pieces exist, but as separate plugins. A dimensionality reduction plugin projects an image stack, a folder of images or a results table with PCA, t-SNE or UMAP into an ImageJ scatter plot [@antinos2020dr]; the qualitative annotation plugins of @thomas2021fiji add a button panel for assigning categories to images or regions of interest. The two do not share state: a category assigned in one is not visible in the other, and neither offers a way to feed labels back into the projection. Fiji also remains centered on the single image or stack, so a collection of thousands of files has to be handled by combining plugins from different authors. The same holds for the neighboring tools. napari [@sofroniew2019napari] with napari-clusters-plotter [@zigutyte2025clusters] offers interactive UMAP and t-SNE with lasso selection, but operates on measurements derived from a segmented label image rather than on a set of images. ilastik [@berg2019ilastik] and QuPath [@bankhead2017qupath] are interactive pixel and object classifiers and assume that the classes are known.
+
+**Exploration-only viewers.** PixPlot [@duhaime2017pixplot] and the TensorBoard Embedding Projector [@smilkov2016projector] render UMAP or t-SNE layouts of image embeddings, PixPlot with thumbnails, and both give a good overview of a collection. Neither has a labeling workflow: what is seen cannot be written down inside the tool.
+
+**Annotation tools.** CVAT [@cvat2023] and Label Studio [@tkachenko2020labelstudio] are mature annotation platforms. They start from a label schema and optimize the throughput of applying it, image by image. They have no view of the collection as a whole and no embedding-based exploration.
+
+**FiftyOne.** The closest tool in scope is FiftyOne [@moore2020fiftyone], an open-source dataset curation platform that combines a sample grid, an embeddings panel with box and lasso selection, and tagging and annotation in one application. The difference lies in the phase of the work each is built for. FiftyOne is aimed at machine learning dataset operations: the user typically arrives with a label schema and a model, uses the embedding view to audit and curate against them, and constructs the dataset and computes the embeddings in Python. Its embedding layout is unsupervised; labels color and filter the plot but do not enter its computation. DaedalusData is aimed at the step before. The label alphabets are the output rather than the input, several can coexist, and they enter the projection as attributes so that the layout changes as the expert's understanding does. The analyst writes no code: the data layout is plain files, and the notebooks are re-run only when features or projections change.
+
+**Visual-interactive labeling.** The underlying process is what the visual analytics literature calls visual-interactive labeling [@bernard2018vial], in which the user rather than a model chooses what to label next. @bernard2018comparing showed this to be competitive with active learning early on, when few labels exist. DaedalusData packages that process for image collections in a form that can be deployed without programming. The design decisions behind it are documented in the original design study [@wyss2025daedalusdata].
 
 # Architecture and Functionality
 
@@ -64,7 +72,7 @@ DaedalusData operates on a simple, file-based data structure with mounted direct
 - **Projections**: Dimensionality reduction results for visualization
 - **Labels**: User-defined label alphabets and assignments
 
-This straightforward, file-based approach enhances interoperability with other tools in scientific workflows and eliminates the need for database expertise or complex backend infrastructure. Researchers can easily inspect, modify, or integrate their data with other scientific tools.
+This file-based approach makes it easy to exchange data with other tools in a scientific workflow and removes the need for a database or a backend service. Researchers can inspect, modify or reuse their data with whatever tools they already have.
 
 ## Key Features
 
@@ -73,20 +81,20 @@ This straightforward, file-based approach enhances interoperability with other t
 DaedalusData provides two primary exploration modes:
 
 1. **Projection View**: Displays images in a 2D space based on dimensionality reduction of selected attributes
-2. **(Semi-)Supervised Projection View**: Include one or more label alphabets into the dimensionality reduction process, allowing for label-informed projections that improve as the user externalizes knowledge.
+2. **Label-Informed Projection View**: Includes one or more label alphabets in the dimensionality reduction, so the layout reflects both the image features and the labels assigned so far.
 
 Both views support interactive zooming, panning, and filtering, allowing users to navigate through thousands of images efficiently. Users can customize the visualization by adjusting image size and transparency to reduce visual clutter.
 
 ### Knowledge Externalization
 
-A key innovation in DaedalusData is its support for knowledge externalization through label-informed projections. As users assign labels to images, these labels can be incorporated as additional attributes in the dimensionality reduction process, creating projections that reflect both image features and expert knowledge. This creates a feedback loop where:
+The central mechanism in DaedalusData is the loop between labeling and projection. As users assign labels to images, these labels can be appended to the feature vectors as additional attributes before dimensionality reduction, producing projections that reflect both image features and expert knowledge. This creates a feedback loop where:
 
 1. Initial projections guide users to discover patterns
 2. Users label images based on discovered patterns
 3. Label-informed projections reveal new patterns incorporating expert knowledge
 4. Additional labels are created, further refining the projections
 
-This iterative process enables the progressive enrichment of the dataset with expert knowledge.
+Each pass through the loop leaves the dataset with more of the expert's knowledge written down as labels.
 
 ### Efficient Labeling
 
@@ -96,8 +104,6 @@ DaedalusData accelerates the labeling process through:
 - Label alphabets to organize related labels into meaningful collections
 - Persistence of selections across different views and projections
 - Visual encoding of labeled images for easy identification
-
-The combination of efficient labeling tools with exploratory visualization significantly reduces the time required to create high-quality labeled datasets.
 
 ### Integration with Scientific Workflows
 
@@ -118,12 +124,10 @@ In each case, the system enabled researchers to interactively explore their imag
 
 # Conclusion
 
-DaedalusData fills an important gap in the scientific software ecosystem by providing an accessible, comprehensive platform for the exploration, knowledge externalization, and labeling of image collections. By combining interactive visualization, efficient labeling tools, and easy deployment through Docker, DaedalusData enables researchers across disciplines to gain insights from their image data more effectively.
+DaedalusData covers the part of an image analysis that comes before a label schema exists: looking at a collection, developing categories, and writing them down as labels that in turn reshape the view. It does so in a single deployable package, so that domain experts can do this work themselves rather than through a programmer.
 
 # Acknowledgments
 
 This work builds upon research originally published in IEEE Transactions on Visualization and Computer Graphics [@wyss2025daedalusdata].
 
 # References
-
-[@wyss2025daedalusdata]: Wyss, A., Morgenshtern, G., Hirsch-Hüsler, A., & Bernard, J. (2025). DaedalusData: Exploration, Knowledge Externalization and Labeling of Particles in Medical Manufacturing — A Design Study. IEEE Transactions on Visualization and Computer Graphics, 31(1), 54-64. https://doi.org/10.1109/TVCG.2024.3456329
