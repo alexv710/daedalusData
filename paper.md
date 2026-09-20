@@ -25,11 +25,11 @@ bibliography: paper.bib
 
 # Summary
 
-DaedalusData is an open-source platform for exploring and labeling large image collections. It combines two-dimensional projections of image content and metadata with interactive filtering, selection and labeling in one web interface, and ships as a Docker Compose setup with Jupyter notebooks for feature extraction and projection. The tool grew out of a design study with domain experts in medical manufacturing [@wyss2025daedalusdata]. It is built for the phase of an analysis in which the categories of interest are not known yet and have to be worked out by looking at the data.
+DaedalusData is an open-source platform for exploring and labeling large collections of 2D images. It combines two-dimensional projections of image content and metadata with interactive filtering, selection and labeling in one web interface, and ships as a Docker Compose setup with Jupyter notebooks for feature extraction and projection. The tool grew out of a design study with domain experts in medical manufacturing [@wyss2025daedalusdata]. It is built for the phase of an analysis in which the categories of interest are not known yet and have to be worked out by looking at the data.
 
 # Statement of need
 
-Many scientific image collections arrive without a taxonomy. Before a classifier can be trained or an annotation campaign planned, someone has to look at thousands of images, work out which patterns recur, and turn them into a set of labels. That person is usually a domain expert, not a programmer. Tools for this phase tend to fall on one of two sides: they either project a collection into two dimensions and let the user look at it, or they let the user apply a label schema that already exists. Moving between the two means exporting, scripting and re-importing, which is the part a domain expert cannot be expected to do.
+Many scientific image collections arrive without a taxonomy. DaedalusData is built for collections of single 2D images, one file per item; volumetric data such as 3D scans has to be sliced or rendered to 2D images before it can be used. Before a classifier can be trained or an annotation campaign planned, someone has to look at thousands of images, work out which patterns recur, and turn them into a set of labels. That person is usually a domain expert, not a programmer. Tools for this phase tend to fall on one of two sides: they either project a collection into two dimensions and let the user look at it, or they let the user apply a label schema that already exists. Moving between the two means exporting, scripting and re-importing, which is the part a domain expert cannot be expected to do.
 
 DaedalusData targets this pre-taxonomy phase. It provides:
 
@@ -66,7 +66,7 @@ The entire system is containerized using Docker, allowing for consistent deploym
 
 DaedalusData operates on a simple, file-based data structure with mounted directories:
 
-- **Images**: Original image files (PNG format)
+- **Images**: Original 2D image files (PNG; the shipped notebooks also read JPEG). 3D volumes, DICOM, NIfTI and image stacks are not read.
 - **Metadata**: JSON files containing attributes associated with each image
 - **Features**: Extracted features in CSV or NPZ format
 - **Projections**: Dimensionality reduction results for visualization
@@ -116,7 +116,7 @@ DaedalusData integrates with existing scientific workflows through:
 
 DaedalusData was originally designed for analysing single object images, but has been applied to diverse image analysis tasks since, including:
 
-1. Medical image analysis for identifying patterns in diagnostic images
+1. Quality control in medical manufacturing, where 2D micrographs of particles found in in-vitro diagnostics consumables are explored and labeled [@wyss2025daedalusdata]
 2. Materials science for classifying microscopy images
 3. General-purpose image exploration and labeling tasks
 
