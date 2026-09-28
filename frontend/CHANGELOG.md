@@ -1,3 +1,14 @@
+## [2.0.0](https://github.com/alexv710/daedalusData/compare/v1.2.0...v2.0.0) (2026-09-28)
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** are the Node 24 runtime and removed deprecated inputs and
+environment variables, none of which the workflows use.
+
+### Build System
+
+* **deps:** bump GitHub Actions to their current majors ([a0bbd55](https://github.com/alexv710/daedalusData/commit/a0bbd559cc27684f08da9f3cb74ee4bb8b0e6610)), closes [#275](https://github.com/alexv710/daedalusData/issues/275) [#276](https://github.com/alexv710/daedalusData/issues/276) [#277](https://github.com/alexv710/daedalusData/issues/277) [#279](https://github.com/alexv710/daedalusData/issues/279)
+
 ## [1.2.0](https://github.com/alexv710/daedalusData/compare/v1.1.0...v1.2.0) (2026-09-28)
 
 ### Features
