@@ -1,10 +1,10 @@
 # DaedalusData
 
-DaedalusData is an open-source platform for the exploration, visualization, and labeling of scientific image collections. It provides researchers and data scientists with a flexible and accessible environment for analyzing, exploring, and extracting knowledge from image datasets.
+DaedalusData is an open-source tool for the exploration, visualization, and labeling of scientific image collections. It helps researchers and data scientists find structure in an image dataset and turn what they find into labels.
 
 **Scope: 2D images only.** DaedalusData works on collections of single 2D raster images (PNG, JPEG), one file per item. It does not read 3D volumes, DICOM, NIfTI, image stacks or multi-page TIFFs; such data has to be sliced or rendered to 2D images first.
 
-**Designed for researchers by researchers**: DaedalusData prioritizes ease of use and minimal setup requirements. You can be up and running in minutes with just Docker installed, no machine learning or web development expertise required. You can run the full application locally with all data fully in your control.
+**Designed for researchers by researchers**: if you can install Docker and run a Jupyter notebook, you can use DaedalusData. The web interface, the Jupyter server and all dependencies come in one container, so there is no web application to build or host, no database to set up and no Python environment to manage. The provided notebooks run as they are; you only write Python if you want to change how features or projections are computed. Everything runs locally, and your data stays on your machine.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
@@ -43,7 +43,7 @@ DaedalusData/
 
 ## Getting Started
 
-DaedalusData is designed to be extremely easy to set up and use. The only prerequisites are:
+DaedalusData runs in a container, so the only prerequisites are:
 
 1. **Docker** - [Installation Guide](https://docs.docker.com/get-docker/)
 2. **Docker Compose** - [Installation Guide](https://docs.docker.com/compose/install/)
@@ -414,7 +414,7 @@ This open-source implementation builds upon research originally published in IEE
 
 **Research Keywords**: Visual Analytics, Image Data, Knowledge Externalization, Data Labeling, Anomaly Detection, Medical Manufacturing
 
-The original design study addressed quality control in medical manufacturing, specifically particle contamination in in-vitro diagnostics consumables, analyzed as 2D particle images. This dockerized implementation makes the DaedalusData approach accessible to researchers in various domains beyond medical manufacturing.
+The original design study addressed quality control in medical manufacturing, specifically particle contamination in in-vitro diagnostics consumables, analyzed as 2D particle images. This dockerized implementation makes the DaedalusData approach available to researchers in other domains.
 
 For more information about the design study methodology, evaluation results, and theoretical framework for knowledge externalization, please refer to the original publication.
 
