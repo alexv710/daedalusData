@@ -2,6 +2,8 @@
 
 DaedalusData is an open-source platform for the exploration, visualization, and labeling of scientific image collections. It provides researchers and data scientists with a flexible and accessible environment for analyzing, exploring, and extracting knowledge from image datasets.
 
+**Scope: 2D images only.** DaedalusData works on collections of single 2D raster images (PNG, JPEG), one file per item. It does not read 3D volumes, DICOM, NIfTI, image stacks or multi-page TIFFs; such data has to be sliced or rendered to 2D images first.
+
 **Designed for researchers by researchers**: DaedalusData prioritizes ease of use and minimal setup requirements. You can be up and running in minutes with just Docker installed, no machine learning or web development expertise required. You can run the full application locally with all data fully in your control.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -14,10 +16,11 @@ DaedalusData is an open-source platform for the exploration, visualization, and 
 
 ## Features
 
-- **Image Exploration**: Browse and interact with image collections in a web-based interface
+- **Image Exploration**: Browse and interact with collections of 2D images in a web-based interface
 - **Dimensionality Reduction**: Visualize high-dimensional data in intuitive 2D projections using Three.js
 - **Metadata Exploration**: Analyze and filter images based on metadata attributes using bar charts and violin plots
 - **Labeling System**: Create and maintain multiple label alphabets for image classification
+- **Label-Informed Projections**: Recompute a projection with a label alphabet included, so the layout reflects the labels assigned so far
 - **Jupyter Integration**: Perform feature extraction and analysis with template notebooks
 - **Fully Dockerized**: Simple setup and deployment with Docker Compose
 - **Extensible Architecture**: Mount directories for easy data interchange with other tools
@@ -80,6 +83,8 @@ This starts two services:
 - **Frontend** → [http://localhost:3000](http://localhost:3000)
 - **Jupyter Lab** → [http://localhost:8888](http://localhost:8888)
 
+The first start builds the image and installs the frontend dependencies inside the container, which can take several minutes. Jupyter is usually reachable first; the frontend only answers once its dependencies are installed and the dev server is up. Follow the progress with `docker compose logs -f app` (or `podman compose logs -f app`). Later starts are much faster.
+
 #### 2. Prepare Sample Data
 
 Open Jupyter at **[http://localhost:8888](http://localhost:8888)** and run the following notebooks in order:
@@ -87,10 +92,10 @@ Open Jupyter at **[http://localhost:8888](http://localhost:8888)** and run the f
 | Notebook | Purpose | Output |
 |----------|---------|--------|
 | `load_demo_dataset.ipynb` | Download sample dataset | `data/images/` & `data/metadata/` |
-| `feature_extraction.ipynb` | Extract image features | `data/features/` |
-| `Dimensionality_Reduction.ipynb` | Compute 2D projections | `data/projections/` |
+| `feature_extraction.ipynb` | Extract image and metadata features | `data/features/` |
+| `Dimensionality_Reduction.ipynb` | Compute 2D projections, including label-informed ones once labels exist | `data/projections/` |
 
-> **Tip:** Run all cells in each notebook sequentially before moving to the next.
+> **Tip:** Run all cells in each notebook sequentially before moving to the next. If a notebook is run too early, it stops and names the notebook to run first.
 
 #### 3. Generate Atlas & Explore
 
@@ -121,7 +126,7 @@ DaedalusData operates on the following data structures:
 
 ### Images
 
-Place your PNG image files in the `data/images/` directory. The image filenames (without extension) must match the keys in your metadata JSON file.
+Place your image files in the `data/images/` directory, one 2D image per file (PNG is the tested format; the shipped notebooks also read JPEG). The image filenames (without extension) must match the keys in your metadata JSON file. Volumetric data (3D volumes, DICOM, NIfTI, stacks) is not supported and must be converted to 2D images before use.
 
 Example structure:
 ```
@@ -262,6 +267,12 @@ A manifest file (`label_manifest.json`) keeps track of all label alphabets:
    - Filter and analyze based on metadata attributes
    - Labeling in the frontend will update the label jsons in `data/labels/`
 
+5. **Label-Informed Projections**:
+   - After labeling, re-run `Dimensionality_Reduction.ipynb`
+   - It writes one extra projection per label alphabet (`umap_labels_<alphabet>.json`), computed from the image features with that alphabet's labels appended
+   - Reload the analysis page and pick the new projection in the projection selector
+   - Repeat steps 4 and 5 as your labels change
+
 ### Jupyter Notebooks
 
 The application provides template notebooks for:
@@ -289,6 +300,8 @@ features = model.predict(preprocessed_images)
 
 This approach provides robust image embeddings without requiring any machine learning expertise.
 
+The same notebook turns the metadata into a table with a fixed column per attribute: numeric attributes are standardized, booleans become 0 or 1, and text attributes with at most 50 distinct values are one-hot encoded. Text attributes that are unique per image, such as names or IDs, are skipped.
+
 #### Dimensionality Reduction
 
 The standard dimensionality reduction uses UMAP to create 2D projections:
@@ -304,9 +317,10 @@ def compute_normalized_umap(features, n_neighbors=15, min_dist=0.1,
     return embedding_centered
 ```
 
-The notebooks generate two standard projections:
+The notebooks generate these projections:
 - Image-only projection based on visual features
-- Combined projection integrating image features and metadata
+- Combined projection integrating image features and metadata, with the metadata scaled so that both count about equally
+- One label-informed projection per label alphabet, once images have been labeled in the frontend
 
 Access Jupyter at [http://localhost:8888](http://localhost:8888).
 
@@ -314,11 +328,11 @@ Access Jupyter at [http://localhost:8888](http://localhost:8888).
 
 The web interface provides tools for:
 
-- Visualizing image collections in 2D/3D projections
+- Visualizing image collections in 2D projections
 - Filtering and selecting images based on metadata
 - Creating and managing label alphabets
 - Visualizing metadata distributions with bar charts and violin plots
-- Exporting labeled datasets
+- Saving labels as plain JSON files in `data/labels/`, which other tools can read directly
 
 Access the frontend at [http://localhost:3000](http://localhost:3000).
 
@@ -400,7 +414,7 @@ This open-source implementation builds upon research originally published in IEE
 
 **Research Keywords**: Visual Analytics, Image Data, Knowledge Externalization, Data Labeling, Anomaly Detection, Medical Manufacturing
 
-The original design study addressed challenges in medical diagnostics, specifically focusing on particle-based contamination in in-vitro diagnostics consumables. This dockerized implementation makes the DaedalusData approach accessible to researchers in various domains beyond medical manufacturing.
+The original design study addressed quality control in medical manufacturing, specifically particle contamination in in-vitro diagnostics consumables, analyzed as 2D particle images. This dockerized implementation makes the DaedalusData approach accessible to researchers in various domains beyond medical manufacturing.
 
 For more information about the design study methodology, evaluation results, and theoretical framework for knowledge externalization, please refer to the original publication.
 
