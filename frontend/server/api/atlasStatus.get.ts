@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { useStorage } from '#imports'
 import { defineEventHandler } from 'h3'
+import { useStorage } from '#imports'
 
 export default defineEventHandler(async () => {
   // Get the atlas generation status from storage
