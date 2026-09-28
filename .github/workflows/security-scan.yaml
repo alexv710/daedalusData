@@ -88,7 +88,7 @@ jobs:
       # Build a smaller image for scanning
       - name: Build Docker image for scanning
         id: docker_build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
