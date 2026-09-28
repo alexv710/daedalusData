@@ -1,4 +1,4 @@
-FROM node:24-slim as dev
+FROM node:24-trixie-slim AS dev
 WORKDIR /app
 
 # Install pnpm with minimal cache
