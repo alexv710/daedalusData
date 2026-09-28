@@ -19,7 +19,7 @@ DaedalusData is an open-source tool for the exploration, visualization, and labe
 - **Image Exploration**: Browse and interact with collections of 2D images in a web-based interface
 - **Dimensionality Reduction**: Visualize high-dimensional data in intuitive 2D projections using Three.js
 - **Metadata Exploration**: Analyze and filter images based on metadata attributes using bar charts and violin plots
-- **Labeling System**: Create and maintain multiple label alphabets for image classification
+- **Labeling**: Create and maintain multiple label alphabets for image classification
 - **Label-Informed Projections**: Recompute a projection with a label alphabet included, so the layout reflects the labels assigned so far
 - **Jupyter Integration**: Perform feature extraction and analysis with template notebooks
 - **Fully Dockerized**: Simple setup and deployment with Docker Compose
@@ -399,7 +399,7 @@ If you use DaedalusData in your research, please cite:
 
 ```
 @article{wyss2023daedalusdata,
-  title={DaedalusData: A Dockerized Open-Source Platform for Exploration, Visualization, and Interactive Labeling of Image Collections},
+  title={DaedalusData: A Dockerized Tool for Exploration, Knowledge Externalization and Labeling of Image Collections},
   author={Wyss, Alexander},
   journal={tbd},
   year={tbd}
