@@ -43,14 +43,14 @@ DaedalusData puts both steps into one loop. Users explore a projection, select g
 | napari-clusters-plotter | Objects in a segmented image | Yes | Cluster annotation | No |
 | PixPlot | Image collections | Yes | No | No |
 | CVAT, Label Studio | Single images | No | Yes | No |
-| FiftyOne | Image datasets | Yes | Yes | No |
+| FiftyOne | Image datasets | Yes | Yes | Not built in |
 | DaedalusData | 2D image collections | Yes | Yes | Yes |
 
 : Open-source tools for exploring and labeling images. \label{tab:tools}
 
 In the ImageJ ecosystem [@schindelin2012fiji], one plugin projects an image stack, a folder of images or a results table into a scatter plot [@antinos2020dr], and the plugins of @thomas2021fiji assign categories to images or regions of interest. The two do not share state, so a category assigned in one can neither be seen in the other nor used in the projection. napari [@sofroniew2019napari] with napari-clusters-plotter [@zigutyte2025clusters] offers UMAP and t-SNE with lasso selection, but for measurements of objects segmented in one image rather than for a collection of images. ilastik [@berg2019ilastik] and QuPath [@bankhead2017qupath] train pixel and object classifiers and assume that the classes are known. PixPlot [@duhaime2017pixplot] lays out image thumbnails with UMAP but has no labeling. CVAT [@cvat2023] and Label Studio [@tkachenko2020labelstudio] apply an existing label schema image by image and show no overview of the collection.
 
-FiftyOne [@moore2020fiftyone] is the closest in scope. It combines a sample grid, an embeddings panel with lasso selection, and tagging and annotation in one application. It is built for curating machine learning datasets: users typically bring a label schema and a model, and load data and compute embeddings in Python. Its built-in embedding view is unsupervised, so labels color and filter the plot but do not change the layout. DaedalusData addresses the step before, when the label alphabets are still being developed and each revision can reshape the layout.
+FiftyOne [@moore2020fiftyone] is the closest in scope. It combines a sample grid, an embeddings panel with lasso selection, and tagging and annotation in one application. It is built for curating machine learning datasets: users typically bring a label schema and a model, and load data and compute embeddings in Python. Its built-in UMAP, t-SNE and PCA layouts are computed from the embeddings alone; labels color and filter the plot but do not change the layout. A label-informed layout requires computing modified embeddings or the points themselves in Python and passing them in. DaedalusData addresses the step before, when the label alphabets are still being developed and each revision can reshape the layout.
 
 The approach follows the visual-interactive labeling process [@bernard2018vial], in which the user rather than a model chooses what to label next. @bernard2018comparing found this competitive with active learning when few labels exist.
 
