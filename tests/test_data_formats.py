@@ -153,7 +153,8 @@ class TestImageDirectory:
         if not images_dir.exists():
             pytest.skip("No images directory found")
 
-        image_files = list(images_dir.glob("*"))
+        # Skip hidden files such as the tracked .gitkeep
+        image_files = [p for p in images_dir.glob("*") if not p.name.startswith(".")]
         if not image_files:
             pytest.skip("No images found (run load_demo_dataset.ipynb first)")
 
