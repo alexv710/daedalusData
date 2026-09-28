@@ -2,12 +2,18 @@
 
 ### ⚠ BREAKING CHANGES
 
-* **deps:** are the Node 24 runtime and removed deprecated inputs and
-environment variables, none of which the workflows use.
+* **deps:** The Docker image moved from `node:24-slim` (Debian bookworm, Python 3.11) to `node:24-trixie-slim` (Debian 13, Python 3.13), which numpy 2.5 requires. Rebuild the image with `docker compose up --build`. Custom notebook code and any extra Python packages need to support Python 3.13.
+* **deps:** The frontend moved from Nuxt 3.15 to Nuxt 4.5, with Vite 8 and pinia 3. On an existing install, remove the compose project's `node_modules` volume once before starting, because pnpm cannot upgrade the old install in place.
 
 ### Build System
 
-* **deps:** bump GitHub Actions to their current majors ([a0bbd55](https://github.com/alexv710/daedalusData/commit/a0bbd559cc27684f08da9f3cb74ee4bb8b0e6610)), closes [#275](https://github.com/alexv710/daedalusData/issues/275) [#276](https://github.com/alexv710/daedalusData/issues/276) [#277](https://github.com/alexv710/daedalusData/issues/277) [#279](https://github.com/alexv710/daedalusData/issues/279)
+* **deps:** bump GitHub Actions to their current majors ([a0bbd55](https://github.com/alexv710/daedalusData/commit/a0bbd559cc27684f08da9f3cb74ee4bb8b0e6610)), closes [#275](https://github.com/alexv710/daedalusData/issues/275) [#276](https://github.com/alexv710/daedalusData/issues/276) [#277](https://github.com/alexv710/daedalusData/issues/277) [#279](https://github.com/alexv710/daedalusData/issues/279) [#280](https://github.com/alexv710/daedalusData/issues/280)
+* **deps:** move the image to Python 3.13 and update the Python stack ([0e9b944](https://github.com/alexv710/daedalusData/commit/0e9b944895913ea1c2d0ac000936371b6b7cf5fa)), closes [#271](https://github.com/alexv710/daedalusData/issues/271) [#273](https://github.com/alexv710/daedalusData/issues/273) [#274](https://github.com/alexv710/daedalusData/issues/274)
+* **deps:** upgrade to Nuxt 4.5 and update the frontend dependencies ([763cb92](https://github.com/alexv710/daedalusData/commit/763cb92b92437604514096874392230c9d4c1160)), closes [#261](https://github.com/alexv710/daedalusData/issues/261) [#262](https://github.com/alexv710/daedalusData/issues/262) [#263](https://github.com/alexv710/daedalusData/issues/263) [#266](https://github.com/alexv710/daedalusData/issues/266) [#267](https://github.com/alexv710/daedalusData/issues/267) [#270](https://github.com/alexv710/daedalusData/issues/270) [#278](https://github.com/alexv710/daedalusData/issues/278) [#281](https://github.com/alexv710/daedalusData/issues/281) [#282](https://github.com/alexv710/daedalusData/issues/282) [#283](https://github.com/alexv710/daedalusData/issues/283)
+
+### Miscellaneous Chores
+
+* **notebooks:** re-run the notebooks on Python 3.13 ([989e6fe](https://github.com/alexv710/daedalusData/commit/989e6fe82b9cc1cbc87da9f00db73b255dd5e398))
 
 ## [1.2.0](https://github.com/alexv710/daedalusData/compare/v1.1.0...v1.2.0) (2026-09-28)
 
