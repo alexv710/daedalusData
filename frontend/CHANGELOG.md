@@ -1,3 +1,13 @@
+## [1.2.0](https://github.com/alexv710/daedalusData/compare/v1.1.0...v1.2.0) (2026-09-28)
+
+### Features
+
+* **notebooks:** add label-informed projections ([5331e22](https://github.com/alexv710/daedalusData/commit/5331e2293109f762e0c98c8dfae780866fd23abb)), closes [#143](https://github.com/alexv710/daedalusData/issues/143)
+
+### Bug Fixes
+
+* **notebooks:** encode metadata features with one column per attribute ([9b9e4cd](https://github.com/alexv710/daedalusData/commit/9b9e4cd79af93ca0a7fe2cb77c915b4e88fa8c06)), closes [#143](https://github.com/alexv710/daedalusData/issues/143)
+
 ## [1.1.0](https://github.com/alexv710/daedalusData/compare/v1.0.2...v1.1.0) (2026-09-05)
 
 ### Features
