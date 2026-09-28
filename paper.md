@@ -1,5 +1,5 @@
 ---
-title: 'DaedalusData: A Dockerized Platform for Exploration, Knowledge Externalization and Labeling of Image Collections'
+title: 'DaedalusData: A Dockerized Tool for Exploration, Knowledge Externalization and Labeling of Image Collections'
 tags:
   - Python
   - JavaScript
