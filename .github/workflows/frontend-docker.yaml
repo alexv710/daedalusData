@@ -2,12 +2,12 @@ name: Frontend Nuxt Docker Build
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main ]
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-docker.yaml'
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main ]
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-docker.yaml'
@@ -43,7 +43,7 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "VERSION=pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/dev" ]]; then
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             VERSION=$(cd frontend && node -p "require('./package.json').version")
             if [[ -z "$VERSION" || "$VERSION" == "undefined" || "$VERSION" == "null" ]]; then
               VERSION=$(git describe --tags --always)

@@ -2,13 +2,13 @@ name: CI and Security
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main ]
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - '.github/*.md'
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main ]
     paths-ignore:
       - '**.md'
       - 'docs/**'

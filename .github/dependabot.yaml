@@ -6,7 +6,6 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    target-branch: "dev"
     open-pull-requests-limit: 10
     groups:
       dev-dependencies:
@@ -31,7 +30,6 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    target-branch: "dev"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
@@ -42,7 +40,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    target-branch: "dev"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
@@ -53,7 +50,6 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-    target-branch: "dev"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
