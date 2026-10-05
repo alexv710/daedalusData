@@ -64,7 +64,7 @@
     "cz-conventional-changelog": "^3.3.0",
     "eslint": "^10.11.0",
     "eslint-plugin-format": "^2.0.1",
-    "globals": "^17.11.0",
+    "globals": "^17.13.0",
     "happy-dom": "^20.11.12",
     "jsdom": "^27.4.0",
     "nuxt": "4.5.2",
