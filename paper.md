@@ -31,11 +31,11 @@ DaedalusData is an open-source tool for exploring and labeling collections of 2D
 
 Many scientific image collections come without a taxonomy. Before a classifier can be trained or an annotation campaign planned, someone has to look through thousands of images, find the patterns that recur and give them names. That person is usually a domain expert who can run a Jupyter notebook but should not have to build or host a web application to do this work. Existing tools split this work in two: some project a collection for visual inspection, others apply a label schema that already exists. Moving between them means exporting, scripting and re-importing data.
 
-DaedalusData puts both steps into one loop. Users explore a projection, select groups of images with a lasso or metadata filters, assign them to labels, and recompute the projection with those labels included. Several label alphabets can describe the same collection from different perspectives. The target users are researchers who have to categorize an image collection before they know which categories it contains.
+DaedalusData's workflow puts both steps into one loop. Users explore a projection, select groups of images with a lasso or metadata filters, assign them to labels, and recompute the projection with those labels included. Several label alphabets can describe the same collection from different perspectives. The target users are researchers who have to categorize an image collection before they know which categories it contains.
 
 # State of the field
 
-\autoref{tab:tools} compares DaedalusData with open-source tools that cover parts of this workflow.
+DaedalusData's approach follows the visual-interactive labeling process [@bernard2018vial], in which the user rather than a model chooses what to label next; @bernard2018comparing found this competitive with active learning when few labels exist. Several open-source tools cover parts of this workflow, each from a different starting point. \autoref{tab:tools} compares them with DaedalusData.
 
 | Tool | Works on | Projection | Labeling | Labels change the projection |
 |:--|:--|:--|:--|:--|
@@ -48,11 +48,9 @@ DaedalusData puts both steps into one loop. Users explore a projection, select g
 
 : Open-source tools for exploring and labeling images. \label{tab:tools}
 
-In the ImageJ ecosystem [@schindelin2012fiji], one plugin projects an image stack, a folder of images or a results table into a scatter plot [@antinos2020dr], and the plugins of @thomas2021fiji assign categories to images or regions of interest. The two do not share state, so a category assigned in one can neither be seen in the other nor used in the projection. napari [@sofroniew2019napari] with napari-clusters-plotter [@zigutyte2025clusters] offers UMAP and t-SNE with lasso selection, but for measurements of objects segmented in one image rather than for a collection of images. ilastik [@berg2019ilastik] and QuPath [@bankhead2017qupath] train pixel and object classifiers and assume that the classes are known. PixPlot [@duhaime2017pixplot] lays out image thumbnails with UMAP but has no labeling. CVAT [@cvat2023] and Label Studio [@tkachenko2020labelstudio] apply an existing label schema image by image and show no overview of the collection.
+In the ImageJ ecosystem, one plugin projects an image stack, a folder of images or a results table into a scatter plot, and other plugins assign categories to images or regions of interest, but the two do not share state, so a category assigned in one can neither be seen in the other nor used in the projection [@schindelin2012fiji]. napari-clusters-plotter [@zigutyte2025clusters] offers UMAP and t-SNE with lasso selection, but for measurements of objects segmented in one image rather than for a collection of images. ilastik [@berg2019ilastik] and QuPath [@bankhead2017qupath] train pixel and object classifiers and assume that the classes are known. PixPlot [@duhaime2017pixplot] lays out image thumbnails with UMAP but has no labeling. CVAT [@cvat2023] and Label Studio [@tkachenko2020labelstudio] apply an existing label schema image by image and show no overview of the collection.
 
 FiftyOne [@moore2020fiftyone] is the closest in scope. It combines a sample grid, an embeddings panel with lasso selection, and tagging and annotation in one application. It is built for curating machine learning datasets: users typically bring a label schema and a model, and load data and compute embeddings in Python. Its built-in UMAP, t-SNE and PCA layouts are computed from the embeddings alone; labels color and filter the plot but do not change the layout. A label-informed layout requires computing modified embeddings or the points themselves in Python and passing them in. DaedalusData addresses the step before, when the label alphabets are still being developed and each revision can reshape the layout.
-
-The approach follows the visual-interactive labeling process [@bernard2018vial], in which the user rather than a model chooses what to label next. @bernard2018comparing found this competitive with active learning when few labels exist.
 
 # Software design
 
