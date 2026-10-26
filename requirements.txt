@@ -1,7 +1,7 @@
 
 numpy>=2.5.3,<2.6.0
 pandas==3.0.6
-pillow==12.3.0
+pillow==13.0.0
 tensorflow==2.21.0
 umap-learn==0.5.12
 kagglehub
