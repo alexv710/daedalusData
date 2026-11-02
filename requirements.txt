@@ -7,4 +7,4 @@ umap-learn==0.5.12
 kagglehub
 requests>=2.34.2
 urllib3>=2.8.0
-pytest>=9.1.1
+pytest>=9.2.0
