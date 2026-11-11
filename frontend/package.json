@@ -65,7 +65,7 @@
     "eslint": "^10.11.0",
     "eslint-plugin-format": "^2.0.1",
     "globals": "^17.11.0",
-    "happy-dom": "^20.11.12",
+    "happy-dom": "^20.14.5",
     "jsdom": "^27.4.0",
     "nuxt": "4.5.2",
     "pinia": "^3.0.4",
