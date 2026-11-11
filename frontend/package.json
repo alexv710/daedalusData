@@ -57,7 +57,7 @@
     "@vitest/coverage-v8": "^5.0.2",
     "@vitest/ui": "^5.0.2",
     "@vue/test-utils": "^2.5.1",
-    "@vueuse/nuxt": "^14.4.0",
+    "@vueuse/nuxt": "^15.0.0",
     "commitizen": "^4.3.2",
     "consola": "^3.4.0",
     "conventional-changelog-conventionalcommits": "^9.3.1",
