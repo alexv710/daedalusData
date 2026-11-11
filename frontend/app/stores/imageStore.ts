@@ -497,8 +497,9 @@ export const useImageStore = defineStore('image', () => {
   function setHoveredImage(id) {
     hoveredId.value = id
 
-    // If we have a detail window open and it's not locked, update it
-    if (imageDetailWindow.value && !isImageFocusLocked.value) {
+    // If we have a detail window open and it's not locked, update it.
+    // Leaving an image passes null; the window then keeps the last image.
+    if (id && imageDetailWindow.value && !isImageFocusLocked.value) {
       updateDetailWindow(id)
     }
   }

@@ -71,7 +71,7 @@ export const useLabelStore = defineStore('labels', () => {
         throw new Error('Failed to load label manifest, please create a new alphabet first.')
       }
       const data: LabelManifest = await response.json()
-      manifest.value = data.alphabets
+      manifest.value = Array.isArray(data.alphabets) ? data.alphabets : []
     }
     catch (error) {
       console.error(error)

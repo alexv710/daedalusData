@@ -5,7 +5,6 @@ const containerSize = ref({ width: 0, height: 0 })
 
 const imageStore = useImageStore()
 const currentProjection = computed(() => imageStore.currentProjection)
-const displayedImage = computed(() => imageStore.displayedImage)
 const isImageFocusLocked = computed(() => imageStore.isImageFocusLocked)
 
 // Load images and projections when the component is mounted
@@ -45,13 +44,9 @@ useResizeObserver(sceneContainer, (entries) => {
 // Function to handle image focus changes
 function handleImageFocusChange(imageKey) {
   if (imageKey) {
-    // If we get a new imageKey, update the hover state
+    // Update the hover state. An open detail window follows the hovered image;
+    // opening it is left to a click or the toolbar button.
     imageStore.setHoveredImage(imageKey)
-
-    // If there's no detail window open yet and we have an image, open it
-    if (displayedImage.value && !imageStore.isDetailWindowOpen()) {
-      imageStore.openDetailWindow(imageKey)
-    }
   }
   else if (!isImageFocusLocked.value) {
     // Clear hover state if not locked and no image is hovered
