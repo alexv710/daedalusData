@@ -336,6 +336,31 @@ The web interface provides tools for:
 
 Access the frontend at [http://localhost:3000](http://localhost:3000).
 
+#### Controls on the Analysis Page
+
+The analysis page shows the same list in a **Controls** card on top of the view. Close the card with its `x` and bring it back with the help button (`?`) in the top bar.
+
+| Action | Effect |
+| --- | --- |
+| Left drag | Pan |
+| Scroll | Zoom |
+| Click an image | Lock the image and open its detail window |
+| `Esc`, or click on empty space | Unlock the image |
+| Right drag | Draw a lasso; the images inside replace the selection |
+| `Ctrl` + right drag | Draw a lasso; the images inside are added to the selection |
+| `Ctrl` + click an image | Add the image to the selection or remove it |
+
+On macOS use `Cmd` instead of `Ctrl`.
+
+#### Assigning Labels
+
+1. Create a label alphabet with **Add Alphabet**, then add labels to it with **Add Label**.
+2. Select images in the view with the lasso or with `Ctrl` + click.
+3. Click a label in the Label Alphabet Manager. The switch above the labels has to be on **Assign to Label**.
+4. Press **Assign N Images to "label"** below the labels. **Remove N Images from "label"** undoes an assignment.
+
+A plain click on an image does not assign anything; it only opens the detail window. With the switch on **Select Images**, a click on a label adds all images of that label to the selection. A right click on a label highlights its images in the view, and a double click opens the label for editing.
+
 ## Testing
 
 DaedalusData includes test suites for both the Python data processing and the frontend application.
