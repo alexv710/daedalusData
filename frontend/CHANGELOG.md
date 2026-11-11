@@ -1,3 +1,13 @@
+## [2.1.0](https://github.com/alexv710/daedalusData/compare/v2.0.0...v2.1.0) (2026-11-11)
+
+### Features
+
+* **frontend:** explain the controls and the label assignment in the app ([9e79730](https://github.com/alexv710/daedalusData/commit/9e797307b17c96d494db25dba90660fa8f3779ba)), closes [#300](https://github.com/alexv710/daedalusData/issues/300)
+
+### Bug Fixes
+
+* **frontend:** keep the detail window on a real image and load broken manifests ([4d9f8b5](https://github.com/alexv710/daedalusData/commit/4d9f8b5c568f4225d2f38c359b19db8923797dc9)), closes [#300](https://github.com/alexv710/daedalusData/issues/300)
+
 ## [2.0.0](https://github.com/alexv710/daedalusData/compare/v1.2.0...v2.0.0) (2026-09-28)
 
 ### ⚠ BREAKING CHANGES
