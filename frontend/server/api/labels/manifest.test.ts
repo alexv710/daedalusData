@@ -24,10 +24,11 @@ describe('pUT /api/labels/manifest', () => {
   let readBodySpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
-    // Spy on synchronous fs methods.
+    // Spy on synchronous fs methods. The write calls are stubbed so that a test
+    // run never touches the real data/labels directory.
     existsSyncSpy = vi.spyOn(fs, 'existsSync')
-    mkdirSyncSpy = vi.spyOn(fs, 'mkdirSync')
-    writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync')
+    mkdirSyncSpy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined)
+    writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined)
     // Spy on readBody from h3 so that it returns our injected body.
     readBodySpy = vi.spyOn(require('h3'), 'readBody').mockImplementation(async (event) => {
       return event._body ?? event.req.body
