@@ -3,6 +3,9 @@ const drawerLeft = ref(true)
 const drawerRight = ref(true)
 const activeTab = ref(0)
 
+// The controls card stays hidden once dismissed; the help button brings it back.
+const showControls = useLocalStorage('daedalusdata-show-controls', true, { initOnMounted: true })
+
 const imageStore = useImageStore()
 const colorMode = useColorMode()
 
@@ -134,6 +137,15 @@ function getDisplayName() {
         <v-btn variant="text" class="mr-4 text-sm" to="/analysis">
           Analysis
         </v-btn>
+        <v-btn
+          icon="mdi-help-circle-outline"
+          variant="text"
+          class="mr-2"
+          title="Show or hide the controls"
+          aria-label="Show or hide the controls"
+          :active="showControls"
+          @click="showControls = !showControls"
+        />
         <DarkToggle class="mr-4" />
         <v-app-bar-nav-icon variant="text" @click.stop="drawerRight = !drawerRight" />
       </v-app-bar>
@@ -174,6 +186,7 @@ function getDisplayName() {
       <v-main>
         <div class="relative h-full">
           <slot />
+          <ControlsHint v-model="showControls" />
           <!-- Small toolbar at the bottom for status info -->
           <div class="bottom-toolbar border-t border-gray-300 bg-gray-100 px-4 py-2 dark:border-gray-700 dark:bg-gray-800">
             <div class="flex items-center justify-between">

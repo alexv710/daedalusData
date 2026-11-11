@@ -12,6 +12,7 @@ const formType = ref<'Label Alphabet' | 'Label'>('Label Alphabet')
 const formState = ref({ name: '', description: '', color: '#000000', alphabetId: '' })
 const editingItem = ref<any>(null)
 const labelSelectionMode = ref(false)
+const selectModifier = useSelectModifier()
 
 // Drag and drop state
 const isDragging = ref(false)
@@ -267,8 +268,8 @@ onMounted(async () => {
           </v-col>
         </v-row>
 
-        <!-- Clear selections button (only visible in selection mode if images are selected) -->
-        <v-row v-if="labelSelectionMode && selectedImagesCount > 0" class="mb-2 justify-center">
+        <!-- Clear selections button (only visible if images are selected) -->
+        <v-row v-if="selectedImagesCount > 0" class="mb-2 justify-center">
           <v-btn color="error" size="small" @click="clearAllSelections">
             <v-icon size="small" class="mr-1">
               mdi-close-circle
@@ -434,6 +435,30 @@ onMounted(async () => {
           Add Alphabet
         </v-btn>
       </v-row>
+
+      <!-- What is still missing before images can be assigned -->
+      <p
+        v-if="labelStore.selectedLabel && !hasSelectedImages"
+        class="mx-4 mb-2 text-center text-sm"
+        data-testid="assign-hint"
+      >
+        No images selected yet. Drag with the right mouse button to lasso images in the view,
+        or {{ selectModifier }} + click single images. Then assign them to
+        "{{ labelStore.selectedLabel.value }}" here.
+      </p>
+      <p
+        v-else-if="!labelStore.selectedLabel && hasSelectedImages && labelStore.alphabets.length > 0"
+        class="mx-4 mb-2 text-center text-sm"
+        data-testid="assign-hint"
+      >
+        {{ selectedImagesCount }} images selected.
+        <template v-if="labelSelectionMode">
+          Set the switch above to "Assign to Label" and click a label to assign them.
+        </template>
+        <template v-else>
+          Click a label to assign them.
+        </template>
+      </p>
 
       <!-- Assignment button -->
       <v-row class="justify-center">

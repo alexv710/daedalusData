@@ -739,6 +739,11 @@ function handleKeyDown(event: KeyboardEvent) {
 }
 
 // ----- Mouse Event Handlers -----
+// macOS turns Ctrl+click into a secondary click, so Cmd works as well.
+function isSelectModifier(event: MouseEvent) {
+  return event.ctrlKey || event.metaKey
+}
+
 function handleMouseDown(event: MouseEvent) {
   if (event.button === 0) {
     leftClickStartPos.value = new THREE.Vector2(event.clientX, event.clientY)
@@ -803,13 +808,13 @@ function handleMouseMove(event: MouseEvent) {
     }
   }
   if (!lassoDrawing.value && !isDragging.value) {
-    updateHoveredMesh('hover', event.ctrlKey, undefined)
+    updateHoveredMesh('hover', isSelectModifier(event), undefined)
   }
 }
 
 function handleMouseUp(event: MouseEvent) {
   if (lassoDrawing.value && event.button === 2) {
-    updateHoveredMesh('lasso', event.ctrlKey, lassoDepthPoints.value)
+    updateHoveredMesh('lasso', isSelectModifier(event), lassoDepthPoints.value)
     lassoDrawing.value = false
     lassoDepthPoints.value = []
     lassoShapePoints.value = []
@@ -825,8 +830,8 @@ function handleMouseUp(event: MouseEvent) {
     if (hitResult) {
       const key = instanceToImageMap.value.get(hitResult.instanceId)
       if (key) {
-        // If ctrl is pressed, handle selection toggling
-        if (event.ctrlKey) {
+        // With Ctrl (or Cmd on macOS) pressed, toggle the selection
+        if (isSelectModifier(event)) {
           imageStore.toggleSelection(key)
         }
         else {
